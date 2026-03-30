@@ -1,0 +1,59 @@
+# mkdocs.yml
+site_name: Django Authz Data Sync
+site_description: Enterprise OpenFGA integration for Django.
+repo_url: https://github.com/your-org/django-authz-data-sync
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy # Adds a copy button to code blocks!
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src] # Auto-generates docs from your Python docstrings
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation & Setup: getting-started/installation.md
+    - Architecture Overview: getting-started/architecture.md
+  - OpenFGA Schema Design:
+    - Roles vs. Permissions: schema/design-guide.md
+  - Developer Guides:
+    - Syncing Models: guides/models.md
+    - Securing API Views: guides/views.md
+    - Nested Hierarchies: guides/advanced-trees.md
+  - API Reference:
+    - Mixins: api/mixins.md
+    - Permissions: api/permissions.md
+    - Settings: api/settings.md

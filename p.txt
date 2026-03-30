@@ -1,0 +1,232 @@
+authz_data_sync
+└── apps.py
+-----------------------------------
+from django.apps import AppConfig
+
+class AuthzDataSyncConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'authz_data_sync'
+    verbose_name = 'Authorization Data Sync (OpenFGA)'
+-----------------------------------
+└── mixins.py
+-----------------------------------
+from django.db import transaction
+from .models import FGASyncOutbox
+from .tasks import process_fga_outbox_batch
+
+
+class AuthzSyncMixin:
+    """
+    Structure-agnostic mixin for synchronizing Django models to OpenFGA via the Outbox pattern.
+    Requires FGA_SETTINGS dictionary to be defined on the model.
+    """
+
+    FGA_SETTINGS = {"object_type": None, "parents": [], "creators": []}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_tuples = self._generate_authz_tuples() if self.pk else []
+
+    def _generate_authz_tuples(self) -> list[dict]:
+        config = getattr(self, "FGA_SETTINGS", {})
+        obj_type = config.get("object_type")
+
+        if not obj_type:
+            raise NotImplementedError(
+                f"{self.__class__.__name__} must define FGA_SETTINGS['object_type']"
+            )
+
+        object_string = f"{obj_type}:{self.pk}"
+        tuples = []
+
+        for parent in config.get("parents", []):
+            parent_id = getattr(self, parent.get("local_field"), None)
+            if parent_id:
+                tuples.append(
+                    {
+                        "user": f"{parent['parent_type']}:{parent_id}",
+                        "relation": parent["relation"],
+                        "object": object_string,
+                    }
+                )
+
+        for creator in config.get("creators", []):
+            user_id = getattr(self, creator.get("local_field"), None)
+            if user_id:
+                tuples.append(
+                    {
+                        "user": f"user:{user_id}",
+                        "relation": creator["relation"],
+                        "object": object_string,
+                    }
+                )
+
+        return tuples
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            current_tuples = self._generate_authz_tuples()
+
+            if is_new:
+                for t in current_tuples:
+                    self._queue_outbox("WRITE", t)
+            else:
+                old_set = {
+                    f"{t['user']}::{t['relation']}::{t['object']}"
+                    for t in self._original_tuples
+                }
+                new_set = {
+                    f"{t['user']}::{t['relation']}::{t['object']}"
+                    for t in current_tuples
+                }
+
+                for t in self._original_tuples:
+                    if f"{t['user']}::{t['relation']}::{t['object']}" not in new_set:
+                        self._queue_outbox("DELETE", t)
+
+                for t in current_tuples:
+                    if f"{t['user']}::{t['relation']}::{t['object']}" not in old_set:
+                        self._queue_outbox("WRITE", t)
+
+            self._original_tuples = current_tuples
+
+    def delete(self, *args, **kwargs):
+        with transaction.atomic():
+            for t in self._generate_authz_tuples():
+                self._queue_outbox("DELETE", t)
+            super().delete(*args, **kwargs)
+
+    def _queue_outbox(self, action, t):
+        FGASyncOutbox.objects.create(
+            action=action,
+            user_id=t["user"],
+            relation=t["relation"],
+            object_id=t["object"],
+        )
+
+        # Fire Celery task only AFTER the local DB transaction fully commits
+        transaction.on_commit(lambda: process_fga_outbox_batch.delay())
+-----------------------------------
+└── models.py
+-----------------------------------
+from django.db import models
+
+
+class FGASyncOutbox(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "Pending"
+        SYNCED = "Synced"
+        FAILED = "Failed"
+
+    class Action(models.TextChoices):
+        WRITE = "Write"
+        DELETE = "Delete"
+
+    action = models.CharField(max_length=7, choices=Action.choices)
+    user_id = models.CharField(max_length=255)
+    relation = models.CharField(max_length=100)
+    object_id = models.CharField(max_length=255)
+
+    status = models.CharField(
+        max_length=7, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    retry_count = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "FGA Sync Task"
+        verbose_name_plural = "FGA Sync Tasks"
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.action} {self.relation} for {self.object_id} ({self.status})"
+-----------------------------------
+└── tasks.py
+-----------------------------------
+import logging
+from celery import shared_task
+from django.db import transaction
+from openfga_sdk.client.models import ClientTuple, ClientWriteRequest
+from .models import FGASyncOutbox
+from .utils import get_fga_client
+
+logger = logging.getLogger(__name__)
+
+
+@shared_task(bind=True, max_retries=5)
+def process_fga_outbox_batch(self):
+    """
+    Sweeps the Outbox for pending tasks, batches them (up to 50), and pushes to OpenFGA.
+    """
+    with transaction.atomic():
+        # Lock the rows to prevent other celery workers from executing the same tuples
+        pending_tasks = list(
+            FGASyncOutbox.objects.select_for_update(skip_locked=True).filter(
+                status="PENDING"
+            )[:50]
+        )
+
+        if not pending_tasks:
+            return "No pending tasks."
+
+        fga_client = get_fga_client()
+        writes = []
+        deletes = []
+
+        for task in pending_tasks:
+            fga_tuple = ClientTuple(
+                user=task.user_id, relation=task.relation, object=task.object_id
+            )
+            if task.action == "WRITE":
+                writes.append(fga_tuple)
+            elif task.action == "DELETE":
+                deletes.append(fga_tuple)
+
+        try:
+            # Send batch network request
+            fga_client.write(ClientWriteRequest(writes=writes, deletes=deletes))
+
+            # Fast bulk update of status
+            task_ids = [t.id for t in pending_tasks]
+            FGASyncOutbox.objects.filter(id__in=task_ids).update(status="SYNCED")
+
+            return f"Successfully synced {len(pending_tasks)} FGA tuples."
+
+        except Exception as e:
+            logger.error(f"FGA Sync Batch Failed: {e}")
+
+            for task in pending_tasks:
+                task.retry_count += 1
+                if task.retry_count >= self.max_retries:
+                    task.status = "FAILED"
+                task.save(update_fields=["retry_count", "status"])
+
+            # Exponential Backoff
+            countdown = 2**self.request.retries
+            raise self.retry(exc=e, countdown=countdown)
+-----------------------------------
+└── utils.py
+-----------------------------------
+from django.conf import settings
+from openfga_sdk.client import ClientConfiguration
+from openfga_sdk.sync import OpenFgaClient
+
+
+def get_fga_client() -> OpenFgaClient:
+    """
+    Instantiates the OpenFGA client using the host app's settings.
+    Requires OPENFGA_API_URL and OPENFGA_STORE_ID in settings.py.
+    """
+    api_url = getattr(settings, "OPENFGA_API_URL", "http://localhost:8080")
+    store_id = getattr(settings, "OPENFGA_STORE_ID", None)
+
+    if not store_id:
+        raise ValueError("OPENFGA_STORE_ID must be defined in Django settings.")
+
+    config = ClientConfiguration(api_url=api_url, store_id=store_id)
+    return OpenFgaClient(config)
+-----------------------------------

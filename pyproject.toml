@@ -1,0 +1,71 @@
+[build-system]
+# Use hatchling as the build backend (modern, fast, standard for uv workflows)
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "django-authz-data-sync"
+version = "0.1.0"
+description = "A declarative, outbox-pattern OpenFGA synchronizer for Django models."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Sadegh Yazdani", email = "m.s.yazdani86@gmail.com" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Framework :: Django",
+    "Framework :: Django :: 4.2",
+    "Framework :: Django :: 5.0",
+    "Framework :: Django :: 5.1",
+    "Framework :: Django :: 5.2",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+# Core dependencies required for the app to run in production
+dependencies = ["Django>=4.2", "celery>=5.0.0", "openfga-sdk>=0.3.0"]
+
+[project.urls]
+Documentation = "https://django-authz-data-sync.readthedocs.io"
+Homepage = "https://github.com/aerosadegh/django-authz-data-sync"
+Repository = "https://github.com/aerosadegh/django-authz-data-sync"
+"Bug Tracker" = "https://github.com/aerosadegh/django-authz-data-sync/issues"
+
+# Optional dependencies for different environments
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-django>=4.8.0",
+    "ruff>=0.3.0",          
+    "build>=1.0.0",         
+    "twine>=5.0.0",         
+]
+docs = [
+    "mkdocs>=1.6.1,<2", 
+    "mkdocs-material>=9.7.6", 
+    "mkdocstrings[python]>=1.0.3"
+]
+
+# Tell hatchling where the source code lives
+[tool.hatch.build.targets.wheel]
+packages = ["src/authz_data_sync"]
+
+# Ruff Configuration (Optional but highly recommended)
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = []
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.test_settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
