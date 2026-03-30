@@ -1,0 +1,140 @@
+
+# Nested Hierarchies (Tree Views)
+
+When building nested API responses (e.g., Organization -> Folders -> Documents), standard nested DRF serializers can easily trigger massive N+1 queries or accidentally leak unauthorized records. 
+
+To solve this, use a 3-step **Prefetch Pattern**:
+
+1. **Query OpenFGA:** Call `list_objects` for each level of the hierarchy (e.g., allowed Orgs, allowed Folders, allowed Documents).
+2. **Filter Base Querysets:** Create Django querysets using `.filter(id__in=allowed_ids)` for each level.
+3. **Stitch with Prefetch:** Use Django's `Prefetch('related_name', queryset=filtered_queryset)` to stitch the objects together.
+
+
+### Example: Secure Tree API View
+
+Assume you have a standard nested serializer setup where an `Organization` has many `folders`, and a `Folder` has many `documents`. 
+
+Here is how you write a single `APIView` that returns the entire tree securely for the current user:
+
+```python
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.db.models import Prefetch
+from openfga_sdk.client.models import ClientListObjectsRequest
+from authz_data_sync.utils import get_fga_client
+
+from .models import Organization, Folder, Document
+from .serializers import OrganizationNestedSerializer
+
+class SecureHierarchyTreeAPIView(APIView):
+    """
+    Returns a deeply nested tree of Orgs -> Folders -> Documents.
+    100% FGA-secured at every single level, using only 3 DB queries.
+    """
+
+    def get_fga_ids(self, fga_user: str, object_type: str, relation: str) -> list[str]:
+        """Helper to fetch allowed IDs for a specific type from OpenFGA."""
+        client = get_fga_client()
+        response = client.list_objects(
+            ClientListObjectsRequest(
+                user=fga_user,
+                relation=relation,
+                type=object_type
+            )
+        )
+        # Strip the OpenFGA type prefix (e.g., 'document:123' -> '123')
+        prefix = f"{object_type}:"
+        return [obj.replace(prefix, "") for obj in response.objects]
+
+    def get(self, request):
+        fga_user = getattr(request, "fga_user", None)
+        if not fga_user:
+            return Response({"error": "Missing identity."}, status=403)
+
+        # 🤠 STEP 1: Query OpenFGA for the allowed IDs (3 Fast Network Calls)
+        allowed_org_ids = self.get_fga_ids(fga_user, "organization", "member")
+        allowed_folder_ids = self.get_fga_ids(fga_user, "folder", "viewer")
+        allowed_doc_ids = self.get_fga_ids(fga_user, "document", "reader")
+
+        # 🤠 STEP 2: Filter the base querysets securely
+        secure_docs = Document.objects.filter(id__in=allowed_doc_ids)
+        
+        # 🤠 STEP 3: Stitch the tree together from the bottom up using Prefetch
+        secure_folders = Folder.objects.filter(id__in=allowed_folder_ids).prefetch_related(
+            Prefetch('documents', queryset=secure_docs) # Stitches Docs into Folders
+        )
+
+        secure_orgs = Organization.objects.filter(id__in=allowed_org_ids).prefetch_related(
+            Prefetch('folders', queryset=secure_folders) # Stitches Folders into Orgs
+        )
+
+        # 4. Serialize the final, perfectly secured tree!
+        serializer = OrganizationNestedSerializer(secure_orgs, many=True)
+        return Response(serializer.data)
+```
+
+
+### Example: Using DRF Generic Views (ListAPIView)
+
+If you prefer using DRF's Generic Views to take advantage of built-in pagination, filtering, and standard DRF workflows, you can place the exact same Prefetch logic inside the `get_queryset()` method. 
+
+```python
+from rest_framework import generics
+from rest_framework.exceptions import PermissionDenied
+from django.db.models import Prefetch
+from openfga_sdk.client.models import ClientListObjectsRequest
+from authz_data_sync.utils import get_fga_client
+
+from .models import Organization, Folder, Document
+from .serializers import OrganizationNestedSerializer
+
+class SecureHierarchyTreeListAPIView(generics.ListAPIView):
+    """
+    Returns a deeply nested, FGA-secured tree of Orgs -> Folders -> Documents.
+    Built on top of DRF's standard generic ListAPIView.
+    """
+    # Standard DRF setup
+    serializer_class = OrganizationNestedSerializer
+
+    def get_fga_ids(self, fga_user: str, object_type: str, relation: str) -> list[str]:
+        """Helper to fetch allowed IDs for a specific type from OpenFGA."""
+        client = get_fga_client()
+        response = client.list_objects(
+            ClientListObjectsRequest(
+                user=fga_user,
+                relation=relation,
+                type=object_type
+            )
+        )
+        prefix = f"{object_type}:"
+        return [obj.replace(prefix, "") for obj in response.objects]
+
+    def get_queryset(self):
+        """
+        Intercepts the queryset building process to inject FGA security 
+        and high-performance database Prefetching.
+        """
+        fga_user = getattr(self.request, "fga_user", None)
+        if not fga_user:
+            raise PermissionDenied("Missing identity context.")
+
+        # 🤠 STEP 1: Query OpenFGA for the allowed IDs
+        allowed_org_ids = self.get_fga_ids(fga_user, "organization", "member")
+        allowed_folder_ids = self.get_fga_ids(fga_user, "folder", "viewer")
+        allowed_doc_ids = self.get_fga_ids(fga_user, "document", "reader")
+
+        # 🤠 STEP 2: Filter the base querysets securely
+        secure_docs = Document.objects.filter(id__in=allowed_doc_ids)
+        
+        # 🤠 STEP 3: Stitch the tree together from the bottom up using Prefetch
+        secure_folders = Folder.objects.filter(id__in=allowed_folder_ids).prefetch_related(
+            Prefetch('documents', queryset=secure_docs) # Stitches Docs into Folders
+        )
+
+        # 🤠 STEP 4: Return the finalized, top-level queryset to DRF
+        return Organization.objects.filter(id__in=allowed_org_ids).prefetch_related(
+            Prefetch('folders', queryset=secure_folders) # Stitches Folders into Orgs
+        )
+```
+
+This ensures you execute only a few fast network calls and a few fast database queries, returning a 100% secure JSON tree.
