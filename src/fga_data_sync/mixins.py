@@ -156,14 +156,20 @@ class FGAViewMixin:
         super().check_object_permissions(request, obj)  # type: ignore[misc]
         config = self._get_config()
 
-        relation = config.action_relations.get(request.method)
+        relation: str | None = None
+
+        # 1. Resolve relation via Custom ViewSet Action
+        view_action: str | None = getattr(self, "action", None)
+        if view_action:
+            relation = config.action_relations.get(view_action)
+
+        # 2. Default fallback if standard methods are used instead of custom actions
         if not relation:
-            # Default fallback if standard methods are used instead of custom actions
             if request.method in ["PUT", "PATCH"]:
                 relation = config.update_relation
             elif request.method == "DELETE":
                 relation = config.delete_relation
-            elif request.method == "GET":
+            elif request.method in ["GET", "OPTIONS", "HEAD"]:
                 relation = config.read_relation
 
         if config.object_type and relation:
