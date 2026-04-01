@@ -15,7 +15,7 @@ pytestmark = pytest.mark.django_db
 # TEST FIXTURE VIEWS
 # ==========================================
 class DummyListAPIView(FGAViewMixin, generics.ListAPIView):
-    """A concrete implementation of the FGAAuthorizedListAPIView for testing."""
+    """A concrete implementation of the FGAViewMixin and ListAPIView for testing."""
 
     queryset = MockFolder.objects.all()
     fga_config = FGAViewConfig(

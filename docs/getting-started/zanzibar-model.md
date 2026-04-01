@@ -10,13 +10,6 @@ The architecture relies on Relationship-Based Access Control (ReBAC). Roles are 
 * `user:alice` -> `admin` -> `organization:acme`
 * `user:bob` -> `viewer` -> `project:alpha`
 
-### The Materialized Database Mirror
-While OpenFGA serves as the graph authorization engine, our Django `UserRoleAssignment` table acts as a **materialized mirror** of the permission graph. This mirrored state is critical for:
-* Powering the Admin UI
-* Generating Audit Logs
-* Managing Migrations and Debugging
-
-Any time a `UserRoleAssignment` is saved or deleted in Django, an automatic, bidirectional sync updates the OpenFGA graph tuples. The database enforces an idempotent role graph, ensuring duplicate relationship edges cannot be created.
 
 ## Advanced Platform Features
 
