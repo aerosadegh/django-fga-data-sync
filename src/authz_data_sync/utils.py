@@ -6,6 +6,7 @@ from openfga_sdk.client import ClientConfiguration
 from openfga_sdk.sync import OpenFgaClient
 
 from .conf import get_setting
+from .exceptions import FGAConfigurationError
 
 
 # This decorator turns the function into a high-performance Singleton!
@@ -24,4 +25,7 @@ def get_fga_client() -> OpenFgaClient:
         )
 
     config = ClientConfiguration(api_url=api_url, store_id=store_id)
-    return OpenFgaClient(config)
+    try:
+        return OpenFgaClient(config)
+    except Exception as e:
+        raise FGAConfigurationError(f"Failed to initialize FGA client: {e}") from e

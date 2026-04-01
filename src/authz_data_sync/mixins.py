@@ -6,6 +6,9 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from openfga_sdk.client.models import ClientCheckRequest, ClientListObjectsRequest
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.request import Request
+
+from authz_data_sync.models import FGASyncOutbox
 
 from .structs import FGAModelConfig
 from .utils import get_fga_client
@@ -82,7 +85,7 @@ class AuthzSyncMixin:
 
             if is_new:
                 for t in current_tuples:
-                    self._queue_outbox("WRITE", t)
+                    self._queue_outbox(FGASyncOutbox.Action.WRITE, t)
             else:
                 old_set = {
                     f"{t['user']}::{t['relation']}::{t['object']}" for t in self._original_tuples
@@ -91,18 +94,18 @@ class AuthzSyncMixin:
 
                 for t in self._original_tuples:
                     if f"{t['user']}::{t['relation']}::{t['object']}" not in new_set:
-                        self._queue_outbox("DELETE", t)
+                        self._queue_outbox(FGASyncOutbox.Action.DELETE, t)
 
                 for t in current_tuples:
                     if f"{t['user']}::{t['relation']}::{t['object']}" not in old_set:
-                        self._queue_outbox("WRITE", t)
+                        self._queue_outbox(FGASyncOutbox.Action.WRITE, t)
 
             self._original_tuples = current_tuples
 
     def delete(self, *args, **kwargs):
         with transaction.atomic():
             for t in self._generate_authz_tuples():
-                self._queue_outbox("DELETE", t)
+                self._queue_outbox(FGASyncOutbox.Action.DELETE, t)
             super().delete(*args, **kwargs)
 
     def _queue_outbox(self, action, t):
@@ -126,8 +129,10 @@ class FGAAuthorizedListMixin:
     Can be used with ListAPIView or ListCreateAPIView.
     """
 
+    request: Request
+
     fga_object_type = None
-    fga_list_relation = "reader"
+    fga_list_relation = "can_list"
 
     def get_authorized_ids(self) -> list[str]:
         if not self.fga_object_type:
@@ -168,8 +173,20 @@ class FGAViewMixin:
         "create_parent": None,  # Dict defining parent requirements for POST
     }
 
-    def _get_fga_user(self):
-        """Assumes TraefikIdentityMiddleware has attached the user to the request."""
+    request: Request
+    kwargs: dict[str, Any]
+    lookup_field: str
+
+    def _get_fga_user(self) -> str:
+        """
+        Fetches the FGA user string from the request.
+
+        Returns:
+            str: The formatted FGA user string (e.g., "user:123").
+
+        Raises:
+            PermissionDenied: If the identity context is missing[cite: 28, 208].
+        """
         fga_user = getattr(self.request, "fga_user", None)
         if not fga_user:
             raise PermissionDenied("Missing identity context.")
@@ -179,11 +196,17 @@ class FGAViewMixin:
     # HOOK 1: LISTING (Filter the Queryset)
     # ==========================================
     def get_queryset(self):
+        """
+        Filters the queryset based on OpenFGA allowed IDs if in a List context[cite: 25, 29].
+        """
         queryset = super().get_queryset()
 
-        # Only apply FGA filtering if this is a List request (no lookup kwarg present)
-        # Detail requests will be handled by check_object_permissions to return proper 403s.
-        if self.kwargs.get(self.lookup_field):
+        # Defensive lookup for kwargs to support manual instantiation in tests
+        view_kwargs = getattr(self, "kwargs", {})
+        lookup_value = view_kwargs.get(self.lookup_field)
+
+        # Only apply FGA filtering if this is a List request (no lookup kwarg present) [cite: 29]
+        if lookup_value:
             return queryset
 
         config = getattr(self, "FGA_VIEW_SETTINGS", {})

@@ -1,0 +1,2 @@
+class FGAConfigurationError(Exception):
+    pass

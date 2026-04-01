@@ -7,7 +7,6 @@ from rest_framework.exceptions import PermissionDenied
 
 from authz_data_sync.mixins import FGAViewMixin
 from authz_data_sync.models import FGASyncOutbox
-from authz_data_sync.views import FGAAuthorizedListAPIView
 from tests.models import MockFolder
 
 pytestmark = pytest.mark.django_db
@@ -16,7 +15,7 @@ pytestmark = pytest.mark.django_db
 # ==========================================
 # TEST FIXTURE VIEWS
 # ==========================================
-class DummyListAPIView(FGAAuthorizedListAPIView):
+class DummyListAPIView(FGAViewMixin, generics.ListAPIView):
     """A concrete implementation of the FGAAuthorizedListAPIView for testing."""
 
     queryset = MockFolder.objects.all()
@@ -50,6 +49,8 @@ class DummyFGAViewMixin(FGAViewMixin, generics.RetrieveUpdateDestroyAPIView):
 # THE TEST SUITE
 # ==========================================
 class TestViewsAndMixins:
+    # tests/test_views_and_mixins.py
+
     def test_authorized_list_api_view_filters_queryset(self, api_rf, mock_fga_client):
         """Verifies the standard ListAPIView correctly asks FGA and filters the DB."""
         folder1 = MockFolder.objects.create(name="Public", org_id="o1", creator_id="u1")
@@ -59,6 +60,7 @@ class TestViewsAndMixins:
 
         view = DummyListAPIView()
         view.request = request
+        view.kwargs = {}  # Explicitly initialize kwargs for the test context
 
         # Mock OpenFGA to ONLY return folder1
         mock_fga_client.list_objects.return_value.objects = [f"folder:{folder1.id}"]
@@ -66,7 +68,6 @@ class TestViewsAndMixins:
         # Execute the DRF get_queryset method
         qs = view.get_queryset()
 
-        # Assert the database was filtered down to only what OpenFGA allowed
         assert qs.count() == 1
         assert qs.first() == folder1
 
