@@ -29,12 +29,12 @@ python manage.py migrate fga_data_sync
 
 ## ⚙️ Configuration
 
-Configure the package by adding the `AUTHZ_DATA_SYNC` dictionary to your `settings.py`.
+Configure the package by adding the `FGA_DATA_SYNC` dictionary to your `settings.py`.
 
 ```python
 # settings.py
 
-AUTHZ_DATA_SYNC = {
+FGA_DATA_SYNC = {
     # REQUIRED: The Store ID provisioned by the Central Auth Service
     "OPENFGA_STORE_ID": "01H...XYZ",
 

@@ -13,12 +13,12 @@ DEFAULTS = {
 
 def get_setting(name: str):
     """
-    Fetches a setting from the `AUTHZ_DATA_SYNC` dictionary in `django.conf.settings`.
+    Fetches a setting from the `FGA_DATA_SYNC` dictionary in `django.conf.settings`.
     Falls back to the `DEFAULTS` dictionary if not provided.
     """
-    user_settings = getattr(settings, "AUTHZ_DATA_SYNC", {})
+    user_settings = getattr(settings, "FGA_DATA_SYNC", {})
 
     if name not in DEFAULTS:
-        raise ImproperlyConfigured(f"'{name}' is not a valid AUTHZ_DATA_SYNC setting.")
+        raise ImproperlyConfigured(f"'{name}' is not a valid FGA_DATA_SYNC setting.")
 
     return user_settings.get(name, DEFAULTS[name])

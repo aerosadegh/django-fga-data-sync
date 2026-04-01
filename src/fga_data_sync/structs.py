@@ -87,8 +87,7 @@ class FGAModelConfig:
     """Complete configuration for synchronizing a Django model with OpenFGA authorization tuples.
 
     This is the primary configuration class that defines how a Django model maps to OpenFGA
-    objects, relationships, and ownership patterns. It replaces the legacy dictionary-based
-    FGA_SETTINGS approach with a type-safe, validated dataclass.
+    objects, relationships, and ownership patterns.
 
     The configuration drives automatic tuple creation/deletion when model instances are
     created, updated, or deleted through Django signals or explicit API calls.

@@ -24,7 +24,7 @@ DATABASES = {
 }
 
 # Provide mock FGA Configuration to satisfy the conf.py validators
-AUTHZ_DATA_SYNC = {
+FGA_DATA_SYNC = {
     "OPENFGA_STORE_ID": "01H0H0H0H0H0H0H0H0H0H0H0H0",
     "OPENFGA_API_URL": "http://localhost:8080",
 }

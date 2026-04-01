@@ -15,14 +15,14 @@ from .exceptions import FGAConfigurationError
 @lru_cache(maxsize=1)
 def get_fga_client() -> OpenFgaClient:
     """
-    Instantiates and caches the OpenFGA client using the packaged `AUTHZ_DATA_SYNC` settings.
+    Instantiates and caches the OpenFGA client using the packaged `FGA_DATA_SYNC` settings.
     """
     api_url = get_setting("OPENFGA_API_URL")
     store_id = get_setting("OPENFGA_STORE_ID")
 
     if not store_id:
         raise ImproperlyConfigured(
-            "AUTHZ_DATA_SYNC['OPENFGA_STORE_ID'] must be defined in your Django `settings.py`."
+            "FGA_DATA_SYNC['OPENFGA_STORE_ID'] must be defined in your Django `settings.py`."
         )
 
     config = ClientConfiguration(api_url=api_url, store_id=store_id)
@@ -39,5 +39,5 @@ def _clear_fga_client_cache(sender: Any, setting: str, **kwargs: Any) -> None:
     """
     Automatically clears the lru_cache when Django settings are overridden in tests.
     """
-    if setting == "AUTHZ_DATA_SYNC":
+    if setting == "FGA_DATA_SYNC":
         get_fga_client.cache_clear()

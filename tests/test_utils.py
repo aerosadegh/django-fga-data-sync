@@ -21,8 +21,8 @@ class TestConfigurationAndUtils:
 
     def test_missing_store_id_raises_error(self, settings):
         """Verifies the client refuses to instantiate without a Store ID."""
-        # Temporarily wipe out the AUTHZ_DATA_SYNC settings for this specific test
-        settings.AUTHZ_DATA_SYNC = {}
+        # Temporarily wipe out the FGA_DATA_SYNC settings for this specific test
+        settings.FGA_DATA_SYNC = {}
 
         # Clear the lru_cache on the function so it executes freshly
         get_fga_client.cache_clear()

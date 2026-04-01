@@ -6,7 +6,7 @@ This section covers the core configuration logic and the infrastructure utilitie
 
 ## Configuration (`conf.py`)
 
-The configuration module is responsible for parsing the `AUTHZ_DATA_SYNC` dictionary defined in your core Django `settings.py` and falling back to sensible defaults.
+The configuration module is responsible for parsing the `FGA_DATA_SYNC` dictionary defined in your core Django `settings.py` and falling back to sensible defaults.
 
 ::: fga_data_sync.conf
     options:
@@ -23,7 +23,7 @@ By utilizing this utility, we adhere to the **Single Responsibility Principle (S
 
 ### ⚙️ How it works
 
-Under the hood, `get_fga_client()` fetches the necessary environment configuration from your Django `settings.py` (specifically the `AUTHZ_DATA_SYNC` dictionary). It ensures that parameters like the `OPENFGA_API_URL` and `OPENFGA_STORE_ID` are properly loaded.
+Under the hood, `get_fga_client()` fetches the necessary environment configuration from your Django `settings.py` (specifically the `FGA_DATA_SYNC` dictionary). It ensures that parameters like the `OPENFGA_API_URL` and `OPENFGA_STORE_ID` are properly loaded.
 
 **Performance Note:** It utilizes Python's `@lru_cache` to act as a thread-safe **Singleton**, ensuring the underlying HTTP connection pool is reused across requests for maximum performance.
 
@@ -37,7 +37,7 @@ Under the hood, `get_fga_client()` fetches the necessary environment configurati
 To maintain our **Clean Architecture** and strict layer separation, follow these rules when using `get_fga_client()` in your own application:
 
 !!! warning "Rules of Engagement"
-    * ❌ **DO NOT** use this client directly inside a Django Model (Layer 3). Models should only define FGA mappings declaratively using `FGA_SETTINGS`.
+    * ❌ **DO NOT** use this client directly inside a Django Model (Layer 3). Models should only define FGA mappings declaratively using the `fga_config` attribute with the `FGAModelConfig` data class.
     * ✅ **DO** use this client inside Custom Permissions (Layer 3) to protect your DRF API views.
     * ✅ **DO** use this client inside your Service Layer (Layer 2) if you need to manually query the authorization graph to make complex business logic decisions.
 
