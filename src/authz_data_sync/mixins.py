@@ -7,9 +7,7 @@ from django.db import transaction
 from openfga_sdk.client.models import ClientCheckRequest, ClientListObjectsRequest
 from rest_framework.exceptions import PermissionDenied
 
-from .models import FGASyncOutbox
 from .structs import FGAModelConfig
-from .tasks import process_fga_outbox_batch
 from .utils import get_fga_client
 
 
@@ -108,6 +106,9 @@ class AuthzSyncMixin:
             super().delete(*args, **kwargs)
 
     def _queue_outbox(self, action, t):
+        from .models import FGASyncOutbox
+        from .tasks import process_fga_outbox_batch
+
         FGASyncOutbox.objects.create(
             action=action,
             user_id=t["user"],

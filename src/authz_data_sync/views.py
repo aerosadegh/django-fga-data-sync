@@ -11,7 +11,7 @@ class FGAAuthorizedListAPIView(generics.ListAPIView):
     """
 
     fga_object_type = None  # e.g., "document"
-    fga_list_relation = "reader"  # The default FGA relation required to view
+    fga_list_relation = "can_list"  # The default FGA relation required to view
 
     def get_authorized_ids(self) -> list[str]:
         """Asks OpenFGA for the list of IDs the user is allowed to access."""

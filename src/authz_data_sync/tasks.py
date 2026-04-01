@@ -15,8 +15,11 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True, max_retries=get_setting("MAX_RETRIES"))
 def process_fga_outbox_batch(self):
     """
-    Sweeps the Outbox for pending tasks, batches them (up to 50), and pushes to OpenFGA.
+    Sweeps the Outbox for pending tasks, batches them, and pushes to OpenFGA.
+    Safe against transaction rollbacks during Celery retries.
     """
+    retry_exc = None  # Capture exception to raise AFTER transaction commits
+
     with transaction.atomic():
         # Lock the rows to prevent other celery workers from executing the same tuples
         pending_tasks = list(
@@ -53,13 +56,20 @@ def process_fga_outbox_batch(self):
 
         except Exception as e:
             logger.error(f"FGA Sync Batch Failed: {e}")
-
             for task in pending_tasks:
                 task.retry_count += 1
                 if task.retry_count >= self.max_retries:
                     task.status = "FAILED"
                 task.save(update_fields=["retry_count", "status"])
 
-            # Exponential Backoff
-            countdown = 2**self.request.retries
-            raise self.retry(exc=e, countdown=countdown) from e
+            # Store the exception to raise it AFTER the DB commits
+            retry_exc = e
+
+    # ==========================================
+    # OUTSIDE THE ATOMIC BLOCK
+    # The database has safely committed the retry_counts.
+    # Now we safely tell the Celery broker to retry the task.
+    # ==========================================
+    if retry_exc:
+        countdown = 2**self.request.retries
+        raise self.retry(exc=retry_exc, countdown=countdown)

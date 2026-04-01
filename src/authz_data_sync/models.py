@@ -3,13 +3,15 @@ from django.db import models
 
 class FGASyncOutbox(models.Model):
     class Status(models.TextChoices):
-        PENDING = "Pending"
-        SYNCED = "Synced"
-        FAILED = "Failed"
+        # Database Value, Human Readable Label
+        PENDING = "PENDING", "Pending"
+        SYNCED = "SYNCED", "Synced"
+        FAILED = "FAILED", "Failed"
 
     class Action(models.TextChoices):
-        WRITE = "Write"
-        DELETE = "Delete"
+        # Database Value, Human Readable Label
+        WRITE = "WRITE", "Write"
+        DELETE = "DELETE", "Delete"
 
     action = models.CharField(max_length=7, choices=Action.choices)
     user_id = models.CharField(max_length=255)
