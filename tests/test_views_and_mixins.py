@@ -21,7 +21,7 @@ class DummyListAPIView(FGAAuthorizedListAPIView):
 
     queryset = MockFolder.objects.all()
     fga_object_type = "folder"
-    fga_list_relation = "viewer"
+    fga_list_relation = "can_list"
 
 
 class DummyFGAViewMixin(FGAViewMixin, generics.RetrieveUpdateDestroyAPIView):
@@ -32,16 +32,16 @@ class DummyFGAViewMixin(FGAViewMixin, generics.RetrieveUpdateDestroyAPIView):
 
     FGA_VIEW_SETTINGS: ClassVar[dict] = {
         "object_type": "folder",
-        "list_relation": "viewer",
+        "list_relation": "can_list",
         "create_parent": {
             "parent_type": "organization",
             "payload_field": "org_id",
             "relation": "can_add_folder",
         },
         "detail_relations": {
-            "GET": "viewer",
-            "PUT": "editor",
-            "DELETE": "editor",
+            "GET": "can_list",
+            "PUT": "can_update",
+            "DELETE": "can_delete",
         },
     }
 
@@ -142,7 +142,7 @@ class TestViewsAndMixins:
         mock_fga_client.check.assert_called_once()
         called_request = mock_fga_client.check.call_args[0][0]
 
-        assert called_request.relation == "editor"  # Mapped from "PUT": "editor"
+        assert called_request.relation == "can_update"  # Mapped from "PUT": "can_update"
         assert called_request.object == f"folder:{folder1.id}"
 
     def test_fga_authorized_list_mixin(self, api_rf, mock_fga_client):
@@ -153,7 +153,7 @@ class TestViewsAndMixins:
 
         class DummyMixinListAPIView(FGAAuthorizedListMixin, APIView):
             fga_object_type = "folder"
-            fga_list_relation = "viewer"
+            fga_list_relation = "can_list"
 
             def get_queryset(self):
                 return MockFolder.objects.all()
