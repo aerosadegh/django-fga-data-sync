@@ -1,11 +1,11 @@
 # tests/models.py
 from django.db import models
 
-from fga_data_sync.mixins import FGASyncMixin
+from fga_data_sync.mixins import FGAModelSyncMixin
 from fga_data_sync.structs import FGACreatorConfig, FGAModelConfig, FGAParentConfig
 
 
-class MockOrganization(FGASyncMixin, models.Model):
+class MockOrganization(FGAModelSyncMixin, models.Model):
     name = models.CharField(max_length=50)
     creator_id = models.CharField(max_length=50)
 
@@ -19,7 +19,7 @@ class MockOrganization(FGASyncMixin, models.Model):
         app_label = "fga_data_sync"
 
 
-class MockFolder(FGASyncMixin, models.Model):
+class MockFolder(FGAModelSyncMixin, models.Model):
     name = models.CharField(max_length=50)
     org_id = models.CharField(max_length=50)
     creator_id = models.CharField(max_length=50)

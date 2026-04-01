@@ -11,7 +11,7 @@ from .models import MockFolder, MockOrganization
 pytestmark = pytest.mark.django_db
 
 
-class TestFGASyncMixin:
+class TestFGAModelSyncMixin:
     def test_tuple_generation_on_create(self):
         """Verifies that creating a new object queues the correct WRITE tuples."""
         folder = MockFolder.objects.create(

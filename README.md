@@ -47,17 +47,17 @@ AUTHZ_DATA_SYNC = {
 
 ## 💡 Usage
 
-To synchronize a Django model with OpenFGA, simply inherit from `FGASyncMixin` and define your `fga_config` using the `FGAModelConfig` dataclass. The package handles everything else automatically.
+To synchronize a Django model with OpenFGA, simply inherit from `FGAModelSyncMixin` and define your `fga_config` using the `FGAModelConfig` dataclass. The package handles everything else automatically.
 
 ### Example: Defining Cascading Inheritance & Roles
 
 ```python
 from django.db import models
 from typing import ClassVar
-from fga_data_sync.mixins import FGASyncMixin
+from fga_data_sync.mixins import FGAModelSyncMixin
 from fga_data_sync.structs import FGAModelConfig, FGAParentConfig, FGACreatorConfig
 
-class Document(FGASyncMixin, models.Model):
+class Document(FGAModelSyncMixin, models.Model):
     title = models.CharField(max_length=255)
 
     # Soft references (No foreign keys required for FGA mapping!)

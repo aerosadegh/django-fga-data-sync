@@ -1,17 +1,17 @@
 # Syncing Models to OpenFGA
 
-To synchronize a Django model with OpenFGA, simply inherit from `FGASyncMixin` and define your `fga_config` using the `FGAModelConfig` dataclass. The package handles everything else automatically.
+To synchronize a Django model with OpenFGA, simply inherit from `FGAModelSyncMixin` and define your `fga_config` using the `FGAModelConfig` dataclass. The package handles everything else automatically.
 
 ### Example: Defining Cascading Inheritance & Roles
 
 ```python
 # models.py
 from django.db import models
-from fga_data_sync.mixins import FGASyncMixin
+from fga_data_sync.mixins import FGAModelSyncMixin
 from fga_data_sync.structs import FGAModelConfig, FGAParentConfig, FGACreatorConfig
 from typing import ClassVar
 
-class Organization(FGASyncMixin, models.Model):
+class Organization(FGAModelSyncMixin, models.Model):
     name = models.CharField(max_length=255)
     creator_id = models.UUIDField()
 
@@ -20,7 +20,7 @@ class Organization(FGASyncMixin, models.Model):
         creators=[FGACreatorConfig(relation="admin", local_field="creator_id")]
     )
 
-class Folder(FGASyncMixin, models.Model):
+class Folder(FGAModelSyncMixin, models.Model):
     name = models.CharField(max_length=255)
     organization_id = models.UUIDField()
     creator_id = models.UUIDField()
@@ -42,7 +42,7 @@ class Folder(FGASyncMixin, models.Model):
         ]
     )
 
-class Document(FGASyncMixin, models.Model):
+class Document(FGAModelSyncMixin, models.Model):
     title = models.CharField(max_length=255)
     content = models.TextField()
     folder_id = models.UUIDField()
@@ -112,14 +112,14 @@ graph LR
 ---
 
 ## 2. The Transactional Outbox Lifecycle (Sequence)
-This diagram illustrates the underlying superpower of the `FGASyncMixin`. It shows why calling `.save()` is 100% reliable, protecting your system against network failures to the OpenFGA server.
+This diagram illustrates the underlying superpower of the `FGAModelSyncMixin`. It shows why calling `.save()` is 100% reliable, protecting your system against network failures to the OpenFGA server.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Code as Service Layer
     participant Model as Document Model
-    participant Mixin as FGASyncMixin
+    participant Mixin as FGAModelSyncMixin
     participant DB as PostgreSQL (DB)
     participant Celery as Celery Worker
     participant FGA as OpenFGA Server
@@ -160,11 +160,11 @@ If the custom role assignment is tied directly to the data state of the model (f
 ```python
 # models.py
 from django.db import models
-from fga_data_sync.mixins import FGASyncMixin
+from fga_data_sync.mixins import FGAModelSyncMixin
 from fga_data_sync.models import FGASyncOutbox
 from fga_data_sync.structs import FGAModelConfig
 
-class Document(FGASyncMixin, models.Model):
+class Document(FGAModelSyncMixin, models.Model):
     title = models.CharField(max_length=255)
     folder_id = models.UUIDField()
     creator_id = models.UUIDField()
@@ -239,7 +239,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
 Sometimes, you need to assign a role completely outside the standard Model creation lifecycle. For example, you are building an "Invite User" view where an existing `Organization` admin invites a new user as a `manager`.
 
-Because you aren't calling `Organization.objects.create()`, the `FGASyncMixin.save()` method won't help you. In this case, you can interact directly with the `FGASyncOutbox` model to queue your own custom tuples.
+Because you aren't calling `Organization.objects.create()`, the `FGAModelSyncMixin.save()` method won't help you. In this case, you can interact directly with the `FGASyncOutbox` model to queue your own custom tuples.
 
 The Celery worker sweeps the Outbox entirely independently of how the records got there!
 

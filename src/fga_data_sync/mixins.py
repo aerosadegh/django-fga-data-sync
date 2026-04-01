@@ -15,12 +15,12 @@ from fga_data_sync.tasks import process_fga_outbox_batch
 from fga_data_sync.utils import get_fga_client
 
 __all__ = [
-    "FGASyncMixin",
+    "FGAModelSyncMixin",
     "FGAViewMixin",
 ]
 
 
-class FGASyncMixin:
+class FGAModelSyncMixin:
     """
     Structure-agnostic mixin for synchronizing Django models to OpenFGA via the Outbox pattern.
     Requires `fga_config` to be defined on the model using `FGAModelConfig`.

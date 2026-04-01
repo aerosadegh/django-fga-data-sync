@@ -5,10 +5,10 @@ __version__ = "0.1.0"
 
 def __getattr__(name: str):
     """Lazy loading of exports to avoid Django app registry issues."""
-    if name == "FGASyncMixin":
-        from .mixins import FGASyncMixin
+    if name == "FGAModelSyncMixin":
+        from .mixins import FGAModelSyncMixin
 
-        return FGASyncMixin
+        return FGAModelSyncMixin
     if name == "FGAViewMixin":
         from .mixins import FGAViewMixin
 
@@ -21,4 +21,4 @@ def __getattr__(name: str):
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = ["FGASyncMixin", "FGAViewMixin", "IsFGAAuthorized", "__version__"]
+__all__ = ["FGAModelSyncMixin", "FGAViewMixin", "IsFGAAuthorized", "__version__"]
