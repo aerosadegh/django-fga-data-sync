@@ -1,4 +1,3 @@
-
 # Nested Hierarchies (Tree Views)
 
 When building nested API responses (e.g., Organization -> Folders -> Documents), standard nested DRF serializers can easily trigger massive N+1 queries or accidentally leak unauthorized records. 
@@ -9,8 +8,7 @@ To solve this, use a 3-step **Prefetch Pattern**:
 2. **Filter Base Querysets:** Create Django querysets using `.filter(id__in=allowed_ids)` for each level.
 3. **Stitch with Prefetch:** Use Django's `Prefetch('related_name', queryset=filtered_queryset)` to stitch the objects together.
 
-
-### Example: Secure Tree API View
+### Example 1: Secure Tree API View (Raw)
 
 Assume you have a standard nested serializer setup where an `Organization` has many `folders`, and a `Folder` has many `documents`. 
 
@@ -51,15 +49,15 @@ class SecureHierarchyTreeAPIView(APIView):
         if not fga_user:
             return Response({"error": "Missing identity."}, status=403)
 
-        # 🤠 STEP 1: Query OpenFGA for the allowed IDs (3 Fast Network Calls)
+        # STEP 1: Query OpenFGA for the allowed IDs (3 Fast Network Calls)
         allowed_org_ids = self.get_fga_ids(fga_user, "organization", "member")
         allowed_folder_ids = self.get_fga_ids(fga_user, "folder", "viewer")
         allowed_doc_ids = self.get_fga_ids(fga_user, "document", "reader")
 
-        # 🤠 STEP 2: Filter the base querysets securely
+        # STEP 2: Filter the base querysets securely
         secure_docs = Document.objects.filter(id__in=allowed_doc_ids)
         
-        # 🤠 STEP 3: Stitch the tree together from the bottom up using Prefetch
+        # STEP 3: Stitch the tree together from the bottom up using Prefetch
         secure_folders = Folder.objects.filter(id__in=allowed_folder_ids).prefetch_related(
             Prefetch('documents', queryset=secure_docs) # Stitches Docs into Folders
         )
@@ -74,7 +72,7 @@ class SecureHierarchyTreeAPIView(APIView):
 ```
 
 
-### Example: Using DRF Generic Views (ListAPIView)
+### Example 2: Using DRF Generic Views (ListAPIView)
 
 If you prefer using DRF's Generic Views to take advantage of built-in pagination, filtering, and standard DRF workflows, you can place the exact same Prefetch logic inside the `get_queryset()` method. 
 
@@ -118,23 +116,64 @@ class SecureHierarchyTreeListAPIView(generics.ListAPIView):
         if not fga_user:
             raise PermissionDenied("Missing identity context.")
 
-        # 🤠 STEP 1: Query OpenFGA for the allowed IDs
+        # STEP 1: Query OpenFGA for the allowed IDs
         allowed_org_ids = self.get_fga_ids(fga_user, "organization", "member")
         allowed_folder_ids = self.get_fga_ids(fga_user, "folder", "viewer")
         allowed_doc_ids = self.get_fga_ids(fga_user, "document", "reader")
 
-        # 🤠 STEP 2: Filter the base querysets securely
+        # STEP 2: Filter the base querysets securely
         secure_docs = Document.objects.filter(id__in=allowed_doc_ids)
         
-        # 🤠 STEP 3: Stitch the tree together from the bottom up using Prefetch
+        # STEP 3: Stitch the tree together from the bottom up using Prefetch
         secure_folders = Folder.objects.filter(id__in=allowed_folder_ids).prefetch_related(
             Prefetch('documents', queryset=secure_docs) # Stitches Docs into Folders
         )
 
-        # 🤠 STEP 4: Return the finalized, top-level queryset to DRF
+        # STEP 4: Return the finalized, top-level queryset to DRF
         return Organization.objects.filter(id__in=allowed_org_ids).prefetch_related(
             Prefetch('folders', queryset=secure_folders) # Stitches Folders into Orgs
         )
 ```
 
+#### Serializer for the Standard Views
+
+This is the standard `DocumentSerializer` referenced in the `DocumentCreateAPIView` and `DocumentViewSet` examples in `guides/views.md`. Notice how `creator_id` is set to `read_only=True` because our view logic handles injecting the current user's ID during creation.
+
+```python
+# serializers.py
+from rest_framework import serializers
+from .models import Organization, Folder, Document
+
+class DocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        fields = ['id', 'title', 'creator_id', 'created_at']
+
+class FolderNestedSerializer(serializers.ModelSerializer):
+    # This matches the related_name we used in the Prefetch object!
+    documents = DocumentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Folder
+        fields = ['id', 'name', 'documents']
+
+class OrganizationNestedSerializer(serializers.ModelSerializer):
+    # This matches the related_name we used in the Prefetch object!
+    folders = FolderNestedSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Organization
+        fields = ['id', 'name', 'folders']
+```
+
+
 This ensures you execute only a few fast network calls and a few fast database queries, returning a 100% secure JSON tree.
+
+
+### The OpenFGA Schema (DSL) Powering This View
+
+For the Python code above to work flawlessly, your OpenFGA schema must follow the **Roles vs. Permissions** pattern.
+
+Notice how the generic views do **not** check if the user is an `admin` or an `editor`. They strictly check the **Permissions** (`can_list_org`, `can_list_folder`, `can_read_document`), allowing the OpenFGA graph to calculate all the complex role inheritance automatically.
+
+👉 **[See the Schema Design Guide](/schema/design-guide/#complete-example-cascading-hierarchy) for the exact OpenFGA DSL required to power this view.**

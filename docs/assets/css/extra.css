@@ -1,0 +1,11 @@
+/* docs/stylesheets/extra.css */
+.md-typeset .mermaid {
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+}
+
+.md-typeset .mermaid svg {
+  min-width: 800px; /* Forces the SVG to stay large */
+  height: auto;
+}

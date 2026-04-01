@@ -1,10 +1,17 @@
-# mkdocs.yml
 site_name: Django Authz Data Sync
 site_description: Enterprise OpenFGA integration for Django.
+site_author: "Your Org"
 repo_url: https://github.com/your-org/django-authz-data-sync
+repo_name: "your-org/django-authz-data-sync"
 
 theme:
   name: material
+  # Uncomment and add paths once you have a logo/favicon!
+  # logo: assets/logo.png
+  # favicon: assets/favicon.png
+  font:
+    text: Roboto
+    code: Roboto Mono # Gives code blocks a much cleaner, modern look
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -21,39 +28,95 @@ theme:
         icon: material/brightness-4
         name: Switch to light mode
   features:
+    - navigation.footer
+    # Navigation upgrades
     - navigation.tabs
+    - navigation.tabs.sticky # Keeps top tabs visible when scrolling down
     - navigation.sections
     - navigation.expand
-    - content.code.copy # Adds a copy button to code blocks!
+    - navigation.top # Adds a slick "Back to top" button
+    - navigation.indexes # Allows sections to have their own clickable index pages
+    - toc.follow # The right-hand Table of Contents highlights as you scroll
+    
+    # Search upgrades
+    - search.suggest # Auto-suggests while typing in the search bar
+    - search.highlight # Highlights the search terms on the page
+    
+    # Code block upgrades
+    - content.code.copy # Copy button
+    - content.code.annotate # Allows you to add beautiful inline annotations to code!
+    - content.tabs.link # If you click a "Python" tab on one code block, it switches all code blocks to Python
 
 plugins:
   - search
   - mkdocstrings:
       handlers:
         python:
-          paths: [src] # Auto-generates docs from your Python docstrings
+          paths: [src]
+          options:
+            docstring_style: google # Renders your Python docstrings beautifully
+            show_root_heading: true
 
 markdown_extensions:
+  # 🤠 The magic formatting tools!
+  - admonition # Enables callout blocks (!!! info, !!! warning, !!! danger)
+  - attr_list
+  - md_in_html
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - pymdownx.details # Allows you to make admonitions collapsible (??? info)
+  - pymdownx.superfences
+  - pymdownx.tabbed: # Enables tabbed content inside your markdown pages
+      alternate_style: true 
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
-  - pymdownx.superfences
+  - pymdownx.tasklist: # Renders beautiful checklist boxes
+      custom_checkbox: true
+  - pymdownx.magiclink # Auto-formats URLs into clickable links
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.emoji: # Ensures your 🤠 and other emojis render perfectly via SVG
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 nav:
   - Home: index.md
+  
+  - Project Architecture & Philosophy:
+    - Philosophy: architecture/philosophy.md
+  
   - Getting Started:
     - Installation & Setup: getting-started/installation.md
-    - Architecture Overview: getting-started/architecture.md
+    - Traefik Setup: getting-started/docker-traefik.md
+    - Authorization Flow: getting-started/authz-flow.md
+    - Zanzibar Model: getting-started/zanzibar-model.md
+    
   - OpenFGA Schema Design:
     - Roles vs. Permissions: schema/design-guide.md
-  - Developer Guides:
-    - Syncing Models: guides/models.md
-    - Securing API Views: guides/views.md
-    - Nested Hierarchies: guides/advanced-trees.md
+    - Roles Assignments: schema/role-assignments.md
+    
+  - Examples:
+    - Syncing Models: examples/models.md
+    - Securing API Views: examples/views.md
+    - Nested Hierarchies: examples/advanced-trees.md
+    
   - API Reference:
     - Mixins: api/mixins.md
     - Permissions: api/permissions.md
     - Settings: api/settings.md
+
+
+extra_javascript:
+  - https://unpkg.com/mermaid@11.13.0/dist/mermaid.min.js
+
+extra_css:
+  - assets/css/extra.css
+
