@@ -13,6 +13,7 @@ class FGASyncOutbox(models.Model):
         WRITE = "WRITE", "Write"
         DELETE = "DELETE", "Delete"
 
+    # max_length=7 covers "DELETE" (6 chars) with 1 char buffer for safety
     action = models.CharField(max_length=7, choices=Action.choices)
     user_id = models.CharField(max_length=255)
     relation = models.CharField(max_length=100)

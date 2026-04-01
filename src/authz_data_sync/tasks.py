@@ -7,7 +7,6 @@ from django.db import transaction
 from openfga_sdk.client.models import ClientTuple, ClientWriteRequest
 
 from authz_data_sync.conf import get_setting
-from authz_data_sync.models import FGASyncOutbox
 from authz_data_sync.utils import get_fga_client
 
 logger = logging.getLogger(__name__)
@@ -82,8 +81,8 @@ def fga_retry_on_failure(func: Callable) -> Callable:
     return wrapper
 
 
-@shared_task(bind=True, max_retries=get_setting("MAX_RETRIES"))
 @fga_retry_on_failure
+@shared_task(bind=True, max_retries=get_setting("MAX_RETRIES"))
 def process_fga_outbox_batch(self):
     """
     Process a batch of pending FGA synchronization tasks from the outbox.

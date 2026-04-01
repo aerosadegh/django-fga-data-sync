@@ -1,16 +1,22 @@
 # authz_data_sync/structs.py
 from dataclasses import dataclass, field
 
+__all__ = [
+    "FGAParentConfig",
+    "FGACreatorConfig",
+    "FGAModelConfig",
+    "FGAViewConfig",
+]
+
 
 @dataclass(frozen=True)
 class FGAParentConfig:
-    """
-    Defines how a child object relates to its parent in the OpenFGA authorization graph.
-    
+    """Defines how a child object relates to its parent in the OpenFGA authorization graph.
+
     This configuration establishes hierarchical relationships between objects, enabling
     inherited access patterns. For example, a "document" may belong to a "workspace",
     and users with access to the workspace automatically gain access to its documents.
-    
+
     Attributes:
         relation: The relationship name in the OpenFGA model (e.g., "parent", "owner",
                   "belongs_to"). This must match a relation defined in your FGA schema.
@@ -19,7 +25,7 @@ class FGAParentConfig:
                      definitions without the colon suffix.
         local_field: The Django model field name that stores the parent's primary key.
                      This field should be a ForeignKey or contain the parent object's ID.
-    
+
     Example:
         >>> FGAParentConfig(
         ...     relation="parent",
@@ -27,7 +33,7 @@ class FGAParentConfig:
         ...     local_field="workspace_id"
         ... )
         # This means: document:123 has parent workspace:456
-    
+
     Note:
         Multiple parent configurations can be defined for complex hierarchies,
         but each creates separate tuple relationships in OpenFGA.
@@ -40,13 +46,12 @@ class FGAParentConfig:
 
 @dataclass(frozen=True)
 class FGACreatorConfig:
-    """
-    Defines the ownership relationship assigned to a user when they create an object.
-    
+    """Defines the ownership relationship assigned to a user when they create an object.
+
     This configuration automatically grants the creator specific permissions on the
     object they create, implementing the "creator owns their content" pattern. The
     relationship is established at creation time via signals or model hooks.
-    
+
     Attributes:
         relation: The relationship name in the OpenFGA model representing ownership
                   or creation rights (e.g., "creator", "owner", "author"). This must
@@ -55,19 +60,19 @@ class FGACreatorConfig:
         local_field: The Django model field name that stores the creator's user ID.
                      Typically this is a ForeignKey to the User model or a field
                      named "created_by", "owner", etc.
-    
+
     Example:
         >>> FGACreatorConfig(
         ...     relation="creator",
         ...     local_field="created_by_id"
         ... )
         # This means: user:abc123 is the creator of document:xyz789
-    
+
     Common Use Cases:
         - Granting creators implicit edit/delete permissions on their objects
         - Enabling users to list only objects they've created
         - Implementing audit trails by tracking object ownership
-    
+
     Note:
         The creator relationship is typically written to OpenFGA once at object
         creation time and rarely deleted unless transferring ownership.
@@ -79,16 +84,15 @@ class FGACreatorConfig:
 
 @dataclass(frozen=True)
 class FGAModelConfig:
-    """
-    Complete configuration for synchronizing a Django model with OpenFGA authorization tuples.
-    
+    """Complete configuration for synchronizing a Django model with OpenFGA authorization tuples.
+
     This is the primary configuration class that defines how a Django model maps to OpenFGA
     objects, relationships, and ownership patterns. It replaces the legacy dictionary-based
     FGA_SETTINGS approach with a type-safe, validated dataclass.
-    
+
     The configuration drives automatic tuple creation/deletion when model instances are
     created, updated, or deleted through Django signals or explicit API calls.
-    
+
     Attributes:
         object_type: The OpenFGA type name for this Django model (e.g., "document",
                      "workspace", "project"). This should match your FGA schema's type
@@ -102,7 +106,7 @@ class FGAModelConfig:
                   ownership rights to users who create instances. Each FGACreatorConfig
                   defines which user field represents the creator and what relation name
                   to use in OpenFGA (e.g., "creator", "owner").
-    
+
     Example:
         >>> FGAModelConfig(
         ...     object_type="document",
@@ -120,18 +124,18 @@ class FGAModelConfig:
         ...         )
         ...     ]
         ... )
-    
+
     Validation:
         - object_type must be non-empty (raises ValueError if empty)
         - All parent and creator configurations are validated via their own __post_init__
         - frozen=True prevents accidental mutation after instantiation
-    
+
     Common Patterns:
         - Single parent hierarchy: document -> workspace -> organization
         - Multiple parents: file belongs to both project AND folder
         - Creator ownership: users can edit/delete only objects they created
         - Combined: creators get special rights within parent context
-    
+
     Note:
         This configuration is typically used in model metadata registries or as a
         class attribute on Django models that need FGA synchronization.
@@ -149,16 +153,15 @@ class FGAModelConfig:
 
 @dataclass(frozen=True)
 class FGAViewConfig:
-    """
-    Configuration for enforcing OpenFGA authorization checks on Django views and ViewSets.
-    
+    """Configuration for enforcing OpenFGA authorization checks on Django views and ViewSets.
+
     This dataclass centralizes all authorization settings needed to protect API endpoints
     with OpenFGA checks. It supports multiple authorization strategies including object-level
     permission checks, filtered list queries, and custom action-based relations.
-    
+
     Use this configuration with the IsFGAAuthorized permission class and FGA view mixins
     to automatically enforce access control based on OpenFGA tuples.
-    
+
     Attributes:
         object_type: The OpenFGA type name for objects managed by this view (e.g., "document",
                      "workspace"). Must match the type used in your FGA schema and model
@@ -188,7 +191,7 @@ class FGAViewConfig:
                           Use this for non-CRUD actions like "export", "share", "archive".
                           Keys must match the action names in your ViewSet's @action
                           decorators. Values are the required FGA relations.
-    
+
     Example:
         >>> # Basic CRUD permissions
         >>> FGAViewConfig(
@@ -217,12 +220,12 @@ class FGAViewConfig:
         ...         "archive": "can_archive"
         ...     }
         ... )
-    
+
     Validation:
         - If any create_* parameter is set, all three (create_parent_type,
           create_parent_field, create_relation) must be provided
         - Partial creation configs raise ValueError to prevent misconfiguration
-    
+
     Usage with Views:
         class DocumentViewSet(FGAViewMixin, viewsets.ModelViewSet):
             fga_config = FGAViewConfig(
@@ -230,10 +233,14 @@ class FGAViewConfig:
                 read_relation="reader",
                 update_relation="editor"
             )
-    
+
     Note:
         Relations set to None disable that specific authorization check. Use this
         carefully and only when certain operations don't require FGA enforcement.
+
+    Raises:
+        ValueError: If create_parent_type, create_parent_field, and create_relation are
+                    partially defined (all or none must be provided).
     """
 
     object_type: str
