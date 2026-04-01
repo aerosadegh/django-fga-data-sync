@@ -9,9 +9,9 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 
 from authz_data_sync.models import FGASyncOutbox
-
-from .structs import FGAModelConfig
-from .utils import get_fga_client
+from authz_data_sync.structs import FGAModelConfig
+from authz_data_sync.tasks import process_fga_outbox_batch
+from authz_data_sync.utils import get_fga_client
 
 
 class AuthzSyncMixin:
@@ -108,9 +108,7 @@ class AuthzSyncMixin:
                 self._queue_outbox(FGASyncOutbox.Action.DELETE, t)
             super().delete(*args, **kwargs)
 
-    def _queue_outbox(self, action, t):
-        from .models import FGASyncOutbox
-        from .tasks import process_fga_outbox_batch
+    def _queue_outbox(self, action: FGASyncOutbox.Action, t: dict[str, str]) -> None:
 
         FGASyncOutbox.objects.create(
             action=action,
@@ -185,7 +183,7 @@ class FGAViewMixin:
             str: The formatted FGA user string (e.g., "user:123").
 
         Raises:
-            PermissionDenied: If the identity context is missing[cite: 28, 208].
+            PermissionDenied: If the identity context is missing.
         """
         fga_user = getattr(self.request, "fga_user", None)
         if not fga_user:
@@ -197,7 +195,7 @@ class FGAViewMixin:
     # ==========================================
     def get_queryset(self):
         """
-        Filters the queryset based on OpenFGA allowed IDs if in a List context[cite: 25, 29].
+        Filters the queryset based on OpenFGA allowed IDs if in a List context.
         """
         queryset = super().get_queryset()
 
@@ -205,7 +203,7 @@ class FGAViewMixin:
         view_kwargs = getattr(self, "kwargs", {})
         lookup_value = view_kwargs.get(self.lookup_field)
 
-        # Only apply FGA filtering if this is a List request (no lookup kwarg present) [cite: 29]
+        # Only apply FGA filtering if this is a List request (no lookup kwarg present)
         if lookup_value:
             return queryset
 

@@ -30,5 +30,5 @@ class FGASyncOutbox(models.Model):
         verbose_name_plural = "FGA Sync Tasks"
         ordering = ("created_at",)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.action} {self.relation} for {self.object_id} ({self.status})"

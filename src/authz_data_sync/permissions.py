@@ -20,6 +20,10 @@ class FGAConfiguredView(Protocol):
     action: str | None = None
 
 
+UPDATE_METHODS = {"PUT", "PATCH"}
+DELETE_METHOD = "DELETE"
+
+
 class IsFGAAuthorized(permissions.BasePermission):
     """Evaluates OpenFGA authorization rules strictly based on the view's FGAViewConfig."""
 
@@ -113,9 +117,9 @@ class IsFGAAuthorized(permissions.BasePermission):
         if not relation:
             if request.method in permissions.SAFE_METHODS:
                 relation = config.read_relation
-            elif request.method in ["PUT", "PATCH"]:
+            elif request.method in UPDATE_METHODS:
                 relation = config.update_relation
-            elif request.method == "DELETE":
+            elif request.method == DELETE_METHOD:
                 relation = config.delete_relation
 
         if relation:
