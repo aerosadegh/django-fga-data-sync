@@ -14,13 +14,18 @@ class FGASyncOutbox(models.Model):
         DELETE = "DELETE", "Delete"
 
     # max_length=7 covers "DELETE" (6 chars) with 1 char buffer for safety
-    action = models.CharField(max_length=7, choices=Action.choices)
+    action = models.CharField(
+        max_length=max(len(c[0]) for c in Action.choices), choices=Action.choices
+    )
     user_id = models.CharField(max_length=255)
     relation = models.CharField(max_length=100)
     object_id = models.CharField(max_length=255)
 
     status = models.CharField(
-        max_length=7, choices=Status.choices, default=Status.PENDING, db_index=True
+        max_length=max(len(c[0]) for c in Status.choices),
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
     )
     retry_count = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)

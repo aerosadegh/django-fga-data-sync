@@ -2,9 +2,9 @@
 from dataclasses import dataclass, field
 
 __all__ = [
-    "FGAParentConfig",
     "FGACreatorConfig",
     "FGAModelConfig",
+    "FGAParentConfig",
     "FGAViewConfig",
 ]
 

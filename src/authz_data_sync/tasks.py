@@ -81,8 +81,8 @@ def fga_retry_on_failure(func: Callable) -> Callable:
     return wrapper
 
 
-@fga_retry_on_failure
 @shared_task(bind=True, max_retries=get_setting("MAX_RETRIES"))
+@fga_retry_on_failure
 def process_fga_outbox_batch(self):
     """
     Process a batch of pending FGA synchronization tasks from the outbox.
@@ -112,6 +112,8 @@ def process_fga_outbox_batch(self):
         - Failed tasks are marked FAILED after max_retries attempts
     """
     # Lock the rows to prevent other celery workers from executing the same tuples
+    from authz_data_sync.models import FGASyncOutbox
+
     pending_tasks = list(
         FGASyncOutbox.objects.select_for_update(skip_locked=True).filter(
             status=FGASyncOutbox.Status.PENDING
