@@ -13,6 +13,12 @@ from authz_data_sync.structs import FGAModelConfig
 from authz_data_sync.tasks import process_fga_outbox_batch
 from authz_data_sync.utils import get_fga_client
 
+__all__ = [
+    "AuthzSyncMixin",
+    "FGAAuthorizedListMixin",
+    "FGAViewMixin",
+]
+
 
 class AuthzSyncMixin:
     """
@@ -28,6 +34,7 @@ class AuthzSyncMixin:
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self._original_tuples = self._generate_authz_tuples() if self.pk else []
+        self._fga_task_scheduled = False
 
     def _generate_authz_tuples(self) -> list[dict[str, str]]:
         """
@@ -76,6 +83,31 @@ class AuthzSyncMixin:
 
         return tuples
 
+    def _tuple_to_key(self, t: dict[str, str]) -> str:
+        """Convert a tuple dict to a string key for set operations."""
+        return f"{t['user']}::{t['relation']}::{t['object']}"
+
+    def _compute_tuple_diffs(
+        self, old_tuples: list[dict[str, str]], new_tuples: list[dict[str, str]]
+    ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+        """
+        Compute which tuples need to be deleted and which need to be written.
+
+        Args:
+            old_tuples: List of tuples before the change
+            new_tuples: List of tuples after the change
+
+        Returns:
+            Tuple of (tuples_to_delete, tuples_to_write)
+        """
+        old_set = {self._tuple_to_key(t) for t in old_tuples}
+        new_set = {self._tuple_to_key(t) for t in new_tuples}
+
+        tuples_to_delete = [t for t in old_tuples if self._tuple_to_key(t) not in new_set]
+        tuples_to_write = [t for t in new_tuples if self._tuple_to_key(t) not in old_set]
+
+        return tuples_to_delete, tuples_to_write
+
     def save(self, *args, **kwargs):
         is_new = self.pk is None
 
@@ -87,18 +119,15 @@ class AuthzSyncMixin:
                 for t in current_tuples:
                     self._queue_outbox(FGASyncOutbox.Action.WRITE, t)
             else:
-                old_set = {
-                    f"{t['user']}::{t['relation']}::{t['object']}" for t in self._original_tuples
-                }
-                new_set = {f"{t['user']}::{t['relation']}::{t['object']}" for t in current_tuples}
+                tuples_to_delete, tuples_to_write = self._compute_tuple_diffs(
+                    self._original_tuples, current_tuples
+                )
 
-                for t in self._original_tuples:
-                    if f"{t['user']}::{t['relation']}::{t['object']}" not in new_set:
-                        self._queue_outbox(FGASyncOutbox.Action.DELETE, t)
+                for t in tuples_to_delete:
+                    self._queue_outbox(FGASyncOutbox.Action.DELETE, t)
 
-                for t in current_tuples:
-                    if f"{t['user']}::{t['relation']}::{t['object']}" not in old_set:
-                        self._queue_outbox(FGASyncOutbox.Action.WRITE, t)
+                for t in tuples_to_write:
+                    self._queue_outbox(FGASyncOutbox.Action.WRITE, t)
 
             self._original_tuples = current_tuples
 
@@ -117,8 +146,11 @@ class AuthzSyncMixin:
             object_id=t["object"],
         )
 
-        # Fire Celery task only AFTER the local DB transaction fully commits
-        transaction.on_commit(lambda: process_fga_outbox_batch.delay())
+        # Fire Celery task only AFTER the local DB transaction fully commits.
+        # Only schedule once per transaction to avoid N+1 task scheduling.
+        if not self._fga_task_scheduled:
+            transaction.on_commit(lambda: process_fga_outbox_batch.delay())
+            self._fga_task_scheduled = True
 
 
 class FGAAuthorizedListMixin:
