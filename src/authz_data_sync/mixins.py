@@ -1,10 +1,13 @@
-from typing import ClassVar
+# authz_data_sync/mixins.py
+from typing import Any, ClassVar
 
+from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from openfga_sdk.client.models import ClientCheckRequest, ClientListObjectsRequest
 from rest_framework.exceptions import PermissionDenied
 
 from .models import FGASyncOutbox
+from .structs import FGAModelConfig
 from .tasks import process_fga_outbox_batch
 from .utils import get_fga_client
 
@@ -12,45 +15,57 @@ from .utils import get_fga_client
 class AuthzSyncMixin:
     """
     Structure-agnostic mixin for synchronizing Django models to OpenFGA via the Outbox pattern.
-    Requires FGA_SETTINGS dictionary to be defined on the model.
+    Requires `fga_config` to be defined on the model using `FGAModelConfig`.
     """
 
-    FGA_SETTINGS: ClassVar[dict] = {"object_type": None, "parents": [], "creators": []}
+    # Enforce strict typing on the configuration object
+    fga_config: ClassVar[FGAModelConfig] | None = None
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self._original_tuples = self._generate_authz_tuples() if self.pk else []
 
-    def _generate_authz_tuples(self) -> list[dict]:
-        config = getattr(self, "FGA_SETTINGS", {})
-        obj_type = config.get("object_type")
+    def _generate_authz_tuples(self) -> list[dict[str, str]]:
+        """
+        Generates standard OpenFGA tuples based on the model's FGA configuration.
 
-        if not obj_type:
-            raise NotImplementedError(
-                f"{self.__class__.__name__} must define FGA_SETTINGS['object_type']"
+        Returns:
+            List[Dict[str, str]]: A list of dictionaries representing Zanzibar tuples.
+
+        Raises:
+            ImproperlyConfigured: If fga_config is missing or invalid.
+        """
+        config = getattr(self, "fga_config", None)
+
+        if not isinstance(config, FGAModelConfig):
+            raise ImproperlyConfigured(
+                f"{self.__class__.__name__} must define a valid `fga_config` "
+                f"of type `FGAModelConfig`."
             )
 
-        object_string = f"{obj_type}:{self.pk}"
-        tuples = []
+        object_string = f"{config.object_type}:{self.pk}"
+        tuples: list[dict[str, str]] = []
 
-        for parent in config.get("parents", []):
-            parent_id = getattr(self, parent.get("local_field"), None)
+        # Iterate strictly-typed parent configurations
+        for parent in config.parents:
+            parent_id = getattr(self, parent.local_field, None)
             if parent_id:
                 tuples.append(
                     {
-                        "user": f"{parent['parent_type']}:{parent_id}",
-                        "relation": parent["relation"],
+                        "user": f"{parent.parent_type}:{parent_id}",
+                        "relation": parent.relation,
                         "object": object_string,
                     }
                 )
 
-        for creator in config.get("creators", []):
-            user_id = getattr(self, creator.get("local_field"), None)
+        # Iterate strictly-typed creator configurations
+        for creator in config.creators:
+            user_id = getattr(self, creator.local_field, None)
             if user_id:
                 tuples.append(
                     {
                         "user": f"user:{user_id}",
-                        "relation": creator["relation"],
+                        "relation": creator.relation,
                         "object": object_string,
                     }
                 )
@@ -141,11 +156,11 @@ class FGAViewMixin:
     and Object Checks (Update/Delete/Detail).
     """
 
-    # 🤠 The developer defines this entirely based on their business logic!
+    # The developer defines this entirely based on their business logic!
     FGA_VIEW_SETTINGS: ClassVar[dict] = {
-        "object_type": None,  # e.g., "d_obj"
-        "list_relation": None,  # Relation needed to see the list (e.g., "reader")
-        "detail_relations": {},  # Map of HTTP Method -> Relation (e.g., {"PUT": "editor"})
+        "object_type": None,  # e.g., "document"
+        "list_relation": None,  # Relation needed to see the list (e.g., "can_read_list")
+        "detail_relations": {},  # Map of HTTP Method -> Relation (e.g., {"PUT": "can_update"})
         "create_parent": None,  # Dict defining parent requirements for POST
     }
 

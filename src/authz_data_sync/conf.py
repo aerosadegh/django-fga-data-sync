@@ -2,7 +2,7 @@
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-# 🤠 Sensible defaults so developers don't have to define everything
+# Sensible defaults so developers don't have to define everything
 DEFAULTS = {
     "OPENFGA_API_URL": "http://localhost:8080",
     "OPENFGA_STORE_ID": None,
@@ -13,8 +13,8 @@ DEFAULTS = {
 
 def get_setting(name: str):
     """
-    Fetches a setting from the AUTHZ_DATA_SYNC dictionary in django.conf.settings.
-    Falls back to the DEFAULTS dictionary if not provided.
+    Fetches a setting from the `AUTHZ_DATA_SYNC` dictionary in `django.conf.settings`.
+    Falls back to the `DEFAULTS` dictionary if not provided.
     """
     user_settings = getattr(settings, "AUTHZ_DATA_SYNC", {})
 

@@ -30,7 +30,12 @@ classifiers = [
 ]
 
 # Core dependencies required for the app to run in production
-dependencies = ["Django>=4.2", "celery>=5.0.0", "openfga-sdk>=0.3.0"]
+dependencies = [
+    "Django>=4.2",
+    "celery>=5.0.0",
+    "openfga-sdk>=0.3.0",
+    "djangorestframework",
+]
 
 [project.urls]
 Documentation = "https://django-authz-data-sync.readthedocs.io"

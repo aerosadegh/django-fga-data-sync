@@ -11,7 +11,7 @@ class TraefikIdentityMiddleware:
         dij_user_id = request.headers.get("X-User-Id")
 
         if dij_user_id:
-            # 🤠 Developers now just use `request.fga_user` in any view!
+            # Developers now just use `request.fga_user` in any view!
             request.fga_user = f"user:{dij_user_id}"
         else:
             request.fga_user = None

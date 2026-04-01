@@ -21,7 +21,7 @@ class FGAAuthorizedListAPIView(generics.ListAPIView):
         client = get_fga_client()
         response = client.list_objects(
             ClientListObjectsRequest(
-                user=self.request.fga_user,  # 🤠 Injected by our Middleware!
+                user=self.request.fga_user,  # Injected by our Middleware!
                 relation=self.fga_list_relation,
                 type=self.fga_object_type,
             )
