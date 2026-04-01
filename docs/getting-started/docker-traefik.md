@@ -1,6 +1,6 @@
 # Enterprise Deployment with Traefik
 
-To build a "Defense in Depth" topology, we utilize two distinct Docker networks (`public_net` and `private_net`) and Traefik v3. 
+To build a "Defense in Depth" topology, we utilize two distinct Docker networks (`public_net` and `private_net`) and Traefik v3.
 
 The coolest part of this setup is that the Internal Gateway (port 8080) is completely hidden from the outside world; only the BFF (Next.js) is physically allowed to speak to it.
 
@@ -65,4 +65,3 @@ services:
 1. **The Hand-off:** Next.js fires an internal request to `traefik:8080/miniapp-a/`.
 2. **The Interception:** Traefik hits the `jwt-auth` middleware wall and asks the Auth Service (`/auth/verify`) if the token is good.
 3. **The Resolution:** Auth returns a `200 OK` and attaches user headers (like `X-User-Id`). Traefik maps that header and lets the request through to the Mini-App.
-

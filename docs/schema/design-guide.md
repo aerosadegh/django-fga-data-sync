@@ -1,6 +1,6 @@
 # 🏗️ Designing the OpenFGA Schema (DSL)
 
-To get the most out of `django-authz-data-sync`, your OpenFGA schema must follow the **Roles vs. Permissions Pattern**. 
+To get the most out of `django-authz-data-sync`, your OpenFGA schema must follow the **Roles vs. Permissions Pattern**.
 
 This is an industry-standard Zanzibar architecture that completely decouples your application's security logic from your Python code. By strictly separating **who a user is** from **what a user can do**, you can change business rules on the fly without ever deploying new Django code.
 
@@ -55,12 +55,12 @@ type folder
   relations
     # 1. Structural Link
     define organization: [organization]
-    
+
     # 2. Roles (Inheriting from the Organization)
     define owner: [user] or admin from organization
     define contributor: [user] or manager from organization or owner
     define viewer: [user] or contributor or member from organization
-    
+
     # 3. Permissions (Checked by Django Views)
     define can_edit_folder: owner
     define can_add_items: contributor
@@ -73,7 +73,7 @@ type document
   relations
     # 1. Structural Link
     define folder: [folder]
-    
+
     # 2. Roles (Inheriting from the Folder)
     define editor: [user] or owner from folder or contributor from folder
     define reader: [user] or editor or viewer from folder
@@ -101,7 +101,7 @@ flowchart TD
     %% Styling Definitions
     classDef role fill:none,stroke:#af471e,stroke-width:2px,rx:15,ry:15
     classDef perm fill:none,stroke:#047857,stroke-width:2px,rx:4,ry:4
-    
+
     %% Light/Dark Mode Compatible Highlighting
     classDef highlight fill:none,stroke:#888888,stroke-width:2px,stroke-dasharray: 5 5
 
@@ -124,7 +124,7 @@ flowchart TD
 
         %% Internal Role Cascading (Compact)
         O_SA -.->|or| O_AD -.->|or| O_MG -.->|or| O_MB
-        
+
         %% Permission Mapping
         O_AD --- O_P1
         O_MG --- O_P2
@@ -144,7 +144,7 @@ flowchart TD
 
         %% Internal Role Cascading (Compact)
         F_OW -.->|or| F_CO -.->|or| F_VI
-        
+
         %% Permission Mapping
         F_OW --- F_P1
         F_CO --- F_P2
@@ -163,7 +163,7 @@ flowchart TD
 
         %% Internal Role Cascading (Compact)
         D_ED -.->|or| D_RE
-        
+
         %% Permission Mapping
         D_ED --- D_P1
         D_ED --- D_P2
@@ -173,15 +173,15 @@ flowchart TD
 
     %% ==========================================
     %% STRUCTURAL INHERITANCE
-    %% THE FIX: Using '====' instead of '===' forces Mermaid to add 
+    %% THE FIX: Using '====' instead of '===' forces Mermaid to add
     %% an extra vertical layer between subgraphs, preventing title overlap!
     %% ==========================================
     P_SA === O_SA
-    
+
     O_AD ==== F_OW
     O_MG ==== F_CO
     O_MB ==== F_VI
-    
+
     F_OW ==== D_ED
     F_CO ==== D_ED
     F_VI ==== D_RE

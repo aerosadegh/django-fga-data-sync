@@ -29,17 +29,17 @@ python manage.py migrate authz_data_sync
 
 ## ⚙️ Configuration
 
-Configure the package by adding the `AUTHZ_DATA_SYNC` dictionary to your `settings.py`. 
+Configure the package by adding the `AUTHZ_DATA_SYNC` dictionary to your `settings.py`.
 
 ```python
 # settings.py
 
 AUTHZ_DATA_SYNC = {
     # REQUIRED: The Store ID provisioned by the Central Auth Service
-    "OPENFGA_STORE_ID": "01H...XYZ", 
-    
+    "OPENFGA_STORE_ID": "01H...XYZ",
+
     # OPTIONAL: Defaults shown below
-    "OPENFGA_API_URL": "http://localhost:8080", 
+    "OPENFGA_API_URL": "http://localhost:8080",
     "BATCH_SIZE": 50,
     "MAX_RETRIES": 5,
 }
@@ -57,7 +57,7 @@ from authz_data_sync.mixins import AuthzSyncMixin
 
 class Document(AuthzSyncMixin, models.Model):
     title = models.CharField(max_length=255)
-    
+
     # Soft references (No foreign keys required for Authz mapping!)
     folder_id = models.UUIDField()
     creator_id = models.UUIDField()

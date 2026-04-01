@@ -48,14 +48,15 @@ Repository = "https://github.com/aerosadegh/django-authz-data-sync"
 dev = [
     "pytest>=8.0.0",
     "pytest-django>=4.8.0",
-    "ruff>=0.3.0",          
-    "build>=1.0.0",         
-    "twine>=5.0.0",         
+    "ruff>=0.3.0",
+    "build>=1.0.0",
+    "twine>=5.0.0",
+    "pre-commit>=3.0.0",
 ]
 docs = [
-    "mkdocs>=1.6.1,<2", 
-    "mkdocs-material>=9.7.6", 
-    "mkdocstrings[python]>=1.0.3"
+    "mkdocs>=1.6.1,<2",
+    "mkdocs-material>=9.7.6",
+    "mkdocstrings[python]>=1.0.3",
 ]
 
 # Tell hatchling where the source code lives

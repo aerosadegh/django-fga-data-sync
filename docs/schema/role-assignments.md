@@ -3,7 +3,7 @@
 Because `django-authz-data-sync` bridges Django and OpenFGA, your Django core does not need to hardcode complex hierarchical logic. It simply passes structural strings directly to the OpenFGA graph.
 
 ## How FGA Graph Traversal Works
-When inviting a user to a specific resource (like a `folder`), you **do not** need to include the parent `organization_id` in your API payload. 
+When inviting a user to a specific resource (like a `folder`), you **do not** need to include the parent `organization_id` in your API payload.
 
 When the `folder` was originally created, a **Structural Tuple** was injected into OpenFGA linking the `folder` to the `organization`. Because of this, OpenFGA automatically climbs the graph tree to check permissions. Your frontend only ever needs to pass the exact resource it is interacting with:
 
@@ -32,16 +32,16 @@ from users.models import User
 bob = User.objects.get(email="bob@example.com")
 
 assign_mini_app_role(
-    user_uuid=bob.id, 
-    mini_app_slug="your_app_slug", 
-    role="manager",                
-    resource_type="organization",  
-    resource_id="org_777"          
+    user_uuid=bob.id,
+    mini_app_slug="your_app_slug",
+    role="manager",
+    resource_type="organization",
+    resource_id="org_777"
 )
 ```
 
 ### Method 2: Manually (Django Admin)
-You can also use the **User Role Assignment** proxy table in the Django Admin panel to manually upgrade a user's permissions. 
+You can also use the **User Role Assignment** proxy table in the Django Admin panel to manually upgrade a user's permissions.
 
 ## The Tuple Injection Cheat Sheet
 

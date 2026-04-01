@@ -4,7 +4,7 @@ This document outlines the core philosophy behind the `django-authz-data-sync` p
 
 ## 1. Why We Built This Project
 
-In a standard Django application, authorization logic (checking if a user can read, edit, or delete an object) is often scattered across views, serializers, and custom permission classes. This creates a tightly coupled system where changing a security rule requires rewriting and deploying Python code. 
+In a standard Django application, authorization logic (checking if a user can read, edit, or delete an object) is often scattered across views, serializers, and custom permission classes. This creates a tightly coupled system where changing a security rule requires rewriting and deploying Python code.
 
 Furthermore, as systems scale into microservices, relying solely on the Django ORM for permissions becomes impossible.
 
@@ -20,7 +20,7 @@ A major challenge in distributed systems is "Dual Writes"—saving data to your 
 This package solves this using the **Transactional Outbox Pattern**:
 1. When a Django model is saved or deleted, the `AuthzSyncMixin` intercepts the action.
 2. Instead of calling OpenFGA directly, it generates the necessary relationship tuples (e.g., "user:bob is the owner of folder:123") and saves them to a local `FGASyncOutbox` table within the same atomic database transaction.
-3. Once the database commit is successful, a Celery task (`process_fga_outbox_batch`) is triggered to asynchronously sweep the outbox and push the tuples to the OpenFGA server. 
+3. Once the database commit is successful, a Celery task (`process_fga_outbox_batch`) is triggered to asynchronously sweep the outbox and push the tuples to the OpenFGA server.
 
 This guarantees **eventual consistency**. If the OpenFGA server goes down, the Celery task will utilize exponential backoff to retry the batch later.
 

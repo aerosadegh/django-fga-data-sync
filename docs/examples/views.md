@@ -1,6 +1,6 @@
 # Securing API Views
 
-The developer protects the API using the `IsFGAAuthorized` permission class we built. 
+The developer protects the API using the `IsFGAAuthorized` permission class we built.
 
 You do not have to write custom logic to parse identity headers. The `TraefikIdentityMiddleware` automatically extracts `X-User-Id`.
 
@@ -27,7 +27,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
 class FolderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Folder
-        # organization_id is required from the client payload so the 
+        # organization_id is required from the client payload so the
         # IsFGAAuthorized permission class can verify parent cascading!
         fields = ['id', 'name', 'organization_id', 'creator_id']
         read_only_fields = ['creator_id']
@@ -61,11 +61,11 @@ class OrganizationCreateAPIView(generics.CreateAPIView):
     queryset = Organization.objects.all()
     serializer_class = OrganizationSerializer
     permission_classes = [IsFGAAuthorized]
-    
+
     # Top-level entity: No parent check required in this basic setup.
     def perform_create(self, serializer):
-        raw_user_id = self.request.fga_user.replace("user:", "")         
-        serializer.save(creator_id=raw_user_id) 
+        raw_user_id = self.request.fga_user.replace("user:", "")
+        serializer.save(creator_id=raw_user_id)
 
 class OrganizationDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Organization.objects.all()
@@ -83,16 +83,16 @@ class OrganizationDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 class FolderCreateAPIView(generics.CreateAPIView):
     queryset = Folder.objects.all()
     serializer_class = FolderSerializer
-    permission_classes = [IsFGAAuthorized]     
+    permission_classes = [IsFGAAuthorized]
 
     # 🛡️ Tell the shield what the rules are for Creation
-    fga_create_parent_type = "organization"     
-    fga_create_parent_field = "organization_id"  
-    fga_create_relation = "can_manage_settings"  
+    fga_create_parent_type = "organization"
+    fga_create_parent_field = "organization_id"
+    fga_create_relation = "can_manage_settings"
 
     def perform_create(self, serializer):
-        raw_user_id = self.request.fga_user.replace("user:", "")         
-        serializer.save(creator_id=raw_user_id) 
+        raw_user_id = self.request.fga_user.replace("user:", "")
+        serializer.save(creator_id=raw_user_id)
 
 class FolderDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Folder.objects.all()
@@ -110,16 +110,16 @@ class FolderDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
 class DocumentCreateAPIView(generics.CreateAPIView):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
-    permission_classes = [IsFGAAuthorized]     
+    permission_classes = [IsFGAAuthorized]
 
     # 🛡️ Tell the shield what the rules are for Creation
-    fga_create_parent_type = "folder"     
-    fga_create_parent_field = "folder_id"    
-    fga_create_relation = "can_add_items"      
+    fga_create_parent_type = "folder"
+    fga_create_parent_field = "folder_id"
+    fga_create_relation = "can_add_items"
 
     def perform_create(self, serializer):
-        raw_user_id = self.request.fga_user.replace("user:", "")         
-        serializer.save(creator_id=raw_user_id) 
+        raw_user_id = self.request.fga_user.replace("user:", "")
+        serializer.save(creator_id=raw_user_id)
 
 class DocumentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Document.objects.all()
@@ -177,8 +177,8 @@ class FolderViewSet(viewsets.ModelViewSet):
     # 🛡️ Parent Check for POST (Creation)
     # The user must have 'can_manage_settings' on the parent Organization to create a folder!
     fga_create_parent_type = "organization"
-    fga_create_parent_field = "organization_id" 
-    fga_create_relation = "can_manage_settings" 
+    fga_create_parent_field = "organization_id"
+    fga_create_relation = "can_manage_settings"
 
     def perform_create(self, serializer):
         raw_user_id = self.request.fga_user.replace("user:", "")
@@ -199,7 +199,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     # 🛡️ Parent Check for POST (Creation)
     # The user must have 'can_add_items' on the parent Folder to create a document!
     fga_create_parent_type = "folder"
-    fga_create_parent_field = "folder_id" 
+    fga_create_parent_field = "folder_id"
     fga_create_relation = "can_add_items"
 
     def perform_create(self, serializer):
@@ -209,7 +209,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
 
 !!! info "How the Magic Happens"
-    If a user tries to send a `POST /api/documents/` payload with `{"folder_id": "999", "title": "Secret Doc"}`, the `IsFGAAuthorized` permission class will automatically intercept the request. It will query OpenFGA: *"Does `user:123` have the `can_add_items` permission on `folder:999`?"* 
+    If a user tries to send a `POST /api/documents/` payload with `{"folder_id": "999", "title": "Secret Doc"}`, the `IsFGAAuthorized` permission class will automatically intercept the request. It will query OpenFGA: *"Does `user:123` have the `can_add_items` permission on `folder:999`?"*
 
     If OpenFGA says **no**, the view instantly returns a `403 Forbidden` without a single line of business logic running in your ViewSet! If OpenFGA says **yes**, the record saves, and your model automatically fires the new role tuples into the Outbox table for Celery to sync. Clean Architecture at its finest!
 
@@ -218,7 +218,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
 ## The `FGAViewMixin` & `FGA_VIEW_SETTINGS`
 
-While the `IsFGAAuthorized` permission class is fantastic for explicitly mapping properties on your views, the `FGAViewMixin` offers an alternative, highly condensed dictionary approach. 
+While the `IsFGAAuthorized` permission class is fantastic for explicitly mapping properties on your views, the `FGAViewMixin` offers an alternative, highly condensed dictionary approach.
 
 The developer defines the `FGA_VIEW_SETTINGS` completely based on their business logic to handle three massive DRF lifecycle hooks automatically: Queryset Filtering for lists, Parent Cascading for creation, and HTTP method mapping for object details.
 
@@ -240,22 +240,22 @@ class DocumentViewSet(FGAViewMixin, viewsets.ModelViewSet):
     """
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
-    
+
     # The single source of truth for view-level authorization!
     FGA_VIEW_SETTINGS = {
         # 1. Base Entity Type
         "object_type": "document",
-        
+
         # 2. LISTING: Relation needed to see the list
         "list_relation": "can_read_document",
-        
+
         # 3. CREATION: Dict defining parent requirements for POST
         "create_parent": {
             "parent_type": "folder",
             "payload_field": "folder_id",
             "relation": "can_add_items"
         },
-        
+
         # 4. MUTATION/DETAIL: Map of HTTP Method -> Relation
         "detail_relations": {
             "GET": "can_read_document",
@@ -269,10 +269,10 @@ class DocumentViewSet(FGAViewMixin, viewsets.ModelViewSet):
         # The mixin already verified we have 'can_add_items' on the parent folder!
         # Now we delegate to our Service layer (Layer 2) to handle business logic.
         raw_user_id = self.request.fga_user.replace("user:", "")
-        
+
         service = DocumentService()
         service.create_document(
-            data=serializer.validated_data, 
+            data=serializer.validated_data,
             creator_id=raw_user_id
         )
 ```
@@ -282,7 +282,7 @@ class DocumentViewSet(FGAViewMixin, viewsets.ModelViewSet):
 The `FGAViewMixin` overrides three core DRF methods to apply your `FGA_VIEW_SETTINGS` dictionary safely:
 
 *   **Hook 1: Listing (`get_queryset`)**
-    If the request is for a list (meaning no lookup kwarg is present), the mixin extracts the `list_relation`. It reaches out to OpenFGA, fetches an array of allowed IDs using the injected `request.fga_user`, and applies an `.id__in` filter to your standard Django queryset. 
+    If the request is for a list (meaning no lookup kwarg is present), the mixin extracts the `list_relation`. It reaches out to OpenFGA, fetches an array of allowed IDs using the injected `request.fga_user`, and applies an `.id__in` filter to your standard Django queryset.
 *   **Hook 2: Creation (`check_permissions`)**
     If the request method is `POST`, the mixin extracts the `create_parent` configuration. It intercepts the incoming JSON payload, grabs the UUID from your specified `payload_field` (e.g., `folder_id`), and asks OpenFGA if the user holds the required relation on that parent object. If not, it instantly raises a `PermissionDenied` exception.
 *   **Hook 3: Mutation/Detail (`check_object_permissions`)**

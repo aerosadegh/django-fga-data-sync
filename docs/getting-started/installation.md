@@ -13,7 +13,7 @@ Add it to your `INSTALLED_APPS` and configure the Traefik middleware in your `se
 ```python
 INSTALLED_APPS = [
     # ... your other apps ...
-    'authz_data_sync', 
+    'authz_data_sync',
 ]
 
 MIDDLEWARE = [
@@ -35,11 +35,11 @@ Configure the package by adding the `AUTHZ_DATA_SYNC` dictionary to your `settin
 ```python
 AUTHZ_DATA_SYNC = {
     # REQUIRED: The Store ID provisioned by the Central Auth Service
-    "OPENFGA_STORE_ID": "01H...XYZ",     
+    "OPENFGA_STORE_ID": "01H...XYZ",
     # OPTIONAL: Defaults shown below
     "OPENFGA_API_URL": "http://localhost:8080",
     "BATCH_SIZE": 50,
-    "MAX_RETRIES": 5, 
+    "MAX_RETRIES": 5,
 }
 ```
 
@@ -55,7 +55,7 @@ from celery.schedules import crontab
 
 app.conf.beat_schedule = {
     'fga-outbox-sweeper': {
-        'task': 'authz_data_sync.tasks.process_fga_outbox_batch', 
+        'task': 'authz_data_sync.tasks.process_fga_outbox_batch',
         'schedule': crontab(minute='*/5'), # Sweep the Outbox every 5 minutes
     },
 }

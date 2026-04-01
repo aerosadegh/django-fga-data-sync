@@ -37,11 +37,11 @@ theme:
     - navigation.top # Adds a slick "Back to top" button
     - navigation.indexes # Allows sections to have their own clickable index pages
     - toc.follow # The right-hand Table of Contents highlights as you scroll
-    
+
     # Search upgrades
     - search.suggest # Auto-suggests while typing in the search bar
     - search.highlight # Highlights the search terms on the page
-    
+
     # Code block upgrades
     - content.code.copy # Copy button
     - content.code.annotate # Allows you to add beautiful inline annotations to code!
@@ -68,7 +68,7 @@ markdown_extensions:
   - pymdownx.details # Allows you to make admonitions collapsible (??? info)
   - pymdownx.superfences
   - pymdownx.tabbed: # Enables tabbed content inside your markdown pages
-      alternate_style: true 
+      alternate_style: true
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -89,25 +89,25 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  
+
   - Project Architecture & Philosophy:
     - Philosophy: architecture/philosophy.md
-  
+
   - Getting Started:
     - Installation & Setup: getting-started/installation.md
     - Traefik Setup: getting-started/docker-traefik.md
     - Authorization Flow: getting-started/authz-flow.md
     - Zanzibar Model: getting-started/zanzibar-model.md
-    
+
   - OpenFGA Schema Design:
     - Roles vs. Permissions: schema/design-guide.md
     - Roles Assignments: schema/role-assignments.md
-    
+
   - Examples:
     - Syncing Models: examples/models.md
     - Securing API Views: examples/views.md
     - Nested Hierarchies: examples/advanced-trees.md
-    
+
   - API Reference:
     - Mixins: api/mixins.md
     - Permissions: api/permissions.md
@@ -119,4 +119,3 @@ extra_javascript:
 
 extra_css:
   - assets/css/extra.css
-

@@ -1,4 +1,5 @@
 # authz_data_sync/mixins.py
+import uuid
 from typing import Any, ClassVar
 
 from django.core.exceptions import ImproperlyConfigured
@@ -19,7 +20,9 @@ class AuthzSyncMixin:
     """
 
     # Enforce strict typing on the configuration object
-    fga_config: ClassVar[FGAModelConfig] | None = None
+    fga_config: ClassVar[FGAModelConfig | None] = None
+
+    pk: int | str | uuid.UUID | None
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)

@@ -1,4 +1,4 @@
-# Django Authz Data Sync 
+# Django Authz Data Sync
 
 *The ultimate enterprise authorization platform for Django.*
 
@@ -6,7 +6,7 @@
 [![Django](https://img.shields.io/badge/Django-4.2%20%7C%205.2-0C4B33)](https://www.djangoproject.com/)
 [![OpenFGA](https://img.shields.io/badge/OpenFGA-Ready-8A2BE2)](https://openfga.dev/)
 
-**Django Authz Data Sync** is a declarative, Outbox-pattern OpenFGA synchronizer for Django models. 
+**Django Authz Data Sync** is a declarative, Outbox-pattern OpenFGA synchronizer for Django models.
 
 This package automatically translates your Django relational models into OpenFGA authorization graph tuples. It guarantees perfect, highly-available synchronization between your local PostgreSQL database and your distributed OpenFGA server using the **Transactional Outbox pattern** and **Celery**.
 

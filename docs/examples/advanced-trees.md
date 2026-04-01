@@ -1,6 +1,6 @@
 # Nested Hierarchies (Tree Views)
 
-When building nested API responses (e.g., Organization -> Folders -> Documents), standard nested DRF serializers can easily trigger massive N+1 queries or accidentally leak unauthorized records. 
+When building nested API responses (e.g., Organization -> Folders -> Documents), standard nested DRF serializers can easily trigger massive N+1 queries or accidentally leak unauthorized records.
 
 To solve this, use a 3-step **Prefetch Pattern**:
 
@@ -10,7 +10,7 @@ To solve this, use a 3-step **Prefetch Pattern**:
 
 ### Example 1: Secure Tree API View (Raw)
 
-Assume you have a standard nested serializer setup where an `Organization` has many `folders`, and a `Folder` has many `documents`. 
+Assume you have a standard nested serializer setup where an `Organization` has many `folders`, and a `Folder` has many `documents`.
 
 Here is how you write a single `APIView` that returns the entire tree securely for the current user:
 
@@ -56,7 +56,7 @@ class SecureHierarchyTreeAPIView(APIView):
 
         # STEP 2: Filter the base querysets securely
         secure_docs = Document.objects.filter(id__in=allowed_doc_ids)
-        
+
         # STEP 3: Stitch the tree together from the bottom up using Prefetch
         secure_folders = Folder.objects.filter(id__in=allowed_folder_ids).prefetch_related(
             Prefetch('documents', queryset=secure_docs) # Stitches Docs into Folders
@@ -74,7 +74,7 @@ class SecureHierarchyTreeAPIView(APIView):
 
 ### Example 2: Using DRF Generic Views (ListAPIView)
 
-If you prefer using DRF's Generic Views to take advantage of built-in pagination, filtering, and standard DRF workflows, you can place the exact same Prefetch logic inside the `get_queryset()` method. 
+If you prefer using DRF's Generic Views to take advantage of built-in pagination, filtering, and standard DRF workflows, you can place the exact same Prefetch logic inside the `get_queryset()` method.
 
 ```python
 from rest_framework import generics
@@ -109,7 +109,7 @@ class SecureHierarchyTreeListAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         """
-        Intercepts the queryset building process to inject FGA security 
+        Intercepts the queryset building process to inject FGA security
         and high-performance database Prefetching.
         """
         fga_user = getattr(self.request, "fga_user", None)
@@ -123,7 +123,7 @@ class SecureHierarchyTreeListAPIView(generics.ListAPIView):
 
         # STEP 2: Filter the base querysets securely
         secure_docs = Document.objects.filter(id__in=allowed_doc_ids)
-        
+
         # STEP 3: Stitch the tree together from the bottom up using Prefetch
         secure_folders = Folder.objects.filter(id__in=allowed_folder_ids).prefetch_related(
             Prefetch('documents', queryset=secure_docs) # Stitches Docs into Folders

@@ -17,13 +17,13 @@ The configuration module is responsible for parsing the `AUTHZ_DATA_SYNC` dictio
 
 ## OpenFGA Client Utility (`utils.py`)
 
-The `get_fga_client` function is the centralized infrastructure utility responsible for instantiating and configuring the OpenFGA Python SDK client. 
+The `get_fga_client` function is the centralized infrastructure utility responsible for instantiating and configuring the OpenFGA Python SDK client.
 
 By utilizing this utility, we adhere to the **Single Responsibility Principle (SRP)**. Our application services and permission classes do not need to know *how* to authenticate with OpenFGA or *where* the FGA server lives; they simply request a ready-to-use client and execute their checks.
 
 ### ⚙️ How it works
 
-Under the hood, `get_fga_client()` fetches the necessary environment configuration from your Django `settings.py` (specifically the `AUTHZ_DATA_SYNC` dictionary). It ensures that parameters like the `OPENFGA_API_URL` and `OPENFGA_STORE_ID` are properly loaded. 
+Under the hood, `get_fga_client()` fetches the necessary environment configuration from your Django `settings.py` (specifically the `AUTHZ_DATA_SYNC` dictionary). It ensures that parameters like the `OPENFGA_API_URL` and `OPENFGA_STORE_ID` are properly loaded.
 
 **Performance Note:** It utilizes Python's `@lru_cache` to act as a thread-safe **Singleton**, ensuring the underlying HTTP connection pool is reused across requests for maximum performance.
 
@@ -52,7 +52,7 @@ class DocumentService:
     def publish_document(self, document_id: str, user_id: str):
         # 1. Fetch the configured (and cached) FGA client
         fga_client = get_fga_client()
-        
+
         # 2. Query FGA to ensure the user has the 'editor' role
         response = fga_client.check(
             ClientCheckRequest(
@@ -61,9 +61,9 @@ class DocumentService:
                 object=f"document:{document_id}",
             )
         )
-        
+
         if not response.allowed:
             raise PermissionError("Only editors can publish this document.")
-            
+
         # ... proceed with publishing business logic ...
 ```

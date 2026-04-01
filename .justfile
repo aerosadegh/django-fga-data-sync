@@ -12,7 +12,7 @@ default:
     @just --list
 
 # 🤠 1. The Ultimate Install Command
-# This reads pyproject.toml, creates the venv, installs the package, 
+# This reads pyproject.toml, creates the venv, installs the package,
 # and installs both the 'dev' and 'docs' dependency groups instantly.
 install:
     uv sync --group dev --group docs
