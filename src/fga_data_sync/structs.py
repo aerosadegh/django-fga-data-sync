@@ -126,6 +126,7 @@ class FGAModelConfig:
 
     Validation:
         - object_type must be non-empty (raises ValueError if empty)
+        - Cannot define both parents and creators with overlapping relations (raises ValueError)
         - All parent and creator configurations are validated via their own __post_init__
         - frozen=True prevents accidental mutation after instantiation
 
@@ -138,6 +139,10 @@ class FGAModelConfig:
     Note:
         This configuration is typically used in model metadata registries or as a
         class attribute on Django models that need FGA synchronization.
+        
+    Raises:
+        ValueError: If object_type is empty, or if duplicate relations are defined
+                    across parents and creators (which would cause tuple conflicts).
     """
 
     object_type: str
@@ -148,6 +153,21 @@ class FGAModelConfig:
         """Validates configuration state immediately upon instantiation."""
         if not self.object_type:
             raise ValueError("FGAModelConfig must define an 'object_type'.")
+        
+        # Collect all relations to check for duplicates
+        parent_relations = {p.relation for p in self.parents}
+        creator_relations = {c.relation for c in self.creators}
+        
+        # Check for overlapping relations between parents and creators
+        overlaps = parent_relations & creator_relations
+        if overlaps:
+            raise ValueError(
+                f"FGAModelConfig cannot define the same relation(s) in both "
+                f"'parents' and 'creators': {overlaps}. "
+                f"This would cause ambiguous tuple generation. "
+                f"Models should not assign permissions directly; use either parent "
+                f"inheritance OR creator assignment, not both for the same relation."
+            )
 
 
 @dataclass(frozen=True)
