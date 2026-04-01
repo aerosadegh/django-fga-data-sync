@@ -1,4 +1,4 @@
-# authz_data_sync/conf.py
+# fga_data_sync/conf.py
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 

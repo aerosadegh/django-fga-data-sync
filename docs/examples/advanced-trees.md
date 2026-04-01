@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Prefetch
 from openfga_sdk.client.models import ClientListObjectsRequest
-from authz_data_sync.utils import get_fga_client
+from fga_data_sync.utils import get_fga_client
 
 from .models import Organization, Folder, Document
 from .serializers import OrganizationNestedSerializer
@@ -81,7 +81,7 @@ from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 from django.db.models import Prefetch
 from openfga_sdk.client.models import ClientListObjectsRequest
-from authz_data_sync.utils import get_fga_client
+from fga_data_sync.utils import get_fga_client
 
 from .models import Organization, Folder, Document
 from .serializers import OrganizationNestedSerializer

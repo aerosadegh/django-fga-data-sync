@@ -49,7 +49,7 @@ If you prefer building explicit, single-purpose endpoints, DRF Generic API Views
 ```python
 # views.py (Generics Approach)
 from rest_framework import generics
-from authz_data_sync.permissions import IsFGAAuthorized
+from fga_data_sync.permissions import IsFGAAuthorized
 
 from .models import Organization, Folder, Document
 from .serializers import OrganizationSerializer, FolderSerializer, DocumentSerializer
@@ -141,7 +141,7 @@ If you prefer building RESTful APIs rapidly with ViewSets and Routers, you can c
 ```python
 # views.py (ViewSet Approach)
 from rest_framework import viewsets
-from authz_data_sync.permissions import IsFGAAuthorized
+from fga_data_sync.permissions import IsFGAAuthorized
 from .models import Organization, Folder, Document
 from .serializers import OrganizationSerializer, FolderSerializer, DocumentSerializer
 
@@ -227,7 +227,7 @@ Here is how you would use it on a unified `ModelViewSet`:
 ```python
 # views.py
 from rest_framework import viewsets
-from authz_data_sync.mixins import FGAViewMixin
+from fga_data_sync.mixins import FGAViewMixin
 
 from .models import Document
 from .serializers import DocumentSerializer

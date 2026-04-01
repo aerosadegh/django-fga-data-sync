@@ -1,7 +1,7 @@
 # tests/test_middleware.py
 from unittest.mock import MagicMock
 
-from authz_data_sync.middleware import TraefikIdentityMiddleware
+from fga_data_sync.middleware import TraefikIdentityMiddleware
 
 
 class TestTraefikIdentityMiddleware:

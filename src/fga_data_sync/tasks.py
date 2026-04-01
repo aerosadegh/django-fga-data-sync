@@ -6,8 +6,8 @@ from celery import shared_task
 from django.db import transaction
 from openfga_sdk.client.models import ClientTuple, ClientWriteRequest
 
-from authz_data_sync.conf import get_setting
-from authz_data_sync.utils import get_fga_client
+from fga_data_sync.conf import get_setting
+from fga_data_sync.utils import get_fga_client
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def fga_retry_on_failure(func: Callable) -> Callable:
                 logger.error(f"FGA Sync operation failed: {e}")
 
                 # Get pending tasks from the outbox to update their retry counts
-                from authz_data_sync.models import FGASyncOutbox
+                from fga_data_sync.models import FGASyncOutbox
 
                 pending_tasks = list(
                     FGASyncOutbox.objects.select_for_update(skip_locked=True).filter(
@@ -112,7 +112,7 @@ def process_fga_outbox_batch(self):
         - Failed tasks are marked FAILED after max_retries attempts
     """
     # Lock the rows to prevent other celery workers from executing the same tuples
-    from authz_data_sync.models import FGASyncOutbox
+    from fga_data_sync.models import FGASyncOutbox
 
     pending_tasks = list(
         FGASyncOutbox.objects.select_for_update(skip_locked=True).filter(

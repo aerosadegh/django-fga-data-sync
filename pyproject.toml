@@ -4,7 +4,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "django-authz-data-sync"
+name = "django-fga-data-sync"
 version = "0.1.0"
 description = "A declarative, outbox-pattern OpenFGA synchronizer for Django models."
 readme = "README.md"
@@ -63,7 +63,7 @@ docs = [
 
 # Tell hatchling where the source code lives
 [tool.hatch.build.targets.wheel]
-packages = ["src/authz_data_sync"]
+packages = ["src/fga_data_sync"]
 
 # Ruff Configuration (Optional but highly recommended)
 [tool.ruff]
@@ -92,7 +92,7 @@ python_files = ["test_*.py"]
 addopts = [
     "--strict-markers",
     "--nomigrations",            # Speeds up tests by building DB directly from models
-    "--cov=src/authz_data_sync", # Target directory for coverage
+    "--cov=src/fga_data_sync", # Target directory for coverage
     "--cov-report=term-missing", # Show exact lines missing coverage in terminal
     # "--cov-report=html",         # Generate a beautiful HTML report
 ]
@@ -105,9 +105,9 @@ markers = [
 
 [tool.coverage.run]
 branch = true
-source = ["src/authz_data_sync"]
+source = ["src/fga_data_sync"]
 # Exclude files that do not contain business logic
-omit = ["src/authz_data_sync/apps.py", "*/migrations/*", "__init__.py"]
+omit = ["src/fga_data_sync/apps.py", "*/migrations/*", "__init__.py"]
 
 [tool.coverage.report]
 # Enforce a minimum coverage percentage before CI/CD passes

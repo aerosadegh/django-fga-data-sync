@@ -13,19 +13,19 @@ Add it to your `INSTALLED_APPS` and configure the Traefik middleware in your `se
 ```python
 INSTALLED_APPS = [
     # ... your other apps ...
-    'authz_data_sync',
+    'fga_data_sync',
 ]
 
 MIDDLEWARE = [
     # ...
-    'authz_data_sync.middleware.TraefikIdentityMiddleware', # Automatically extracts X-User-Id
+    'fga_data_sync.middleware.TraefikIdentityMiddleware', # Automatically extracts X-User-Id
 ]
 ```
 
 Run migrations to create the Outbox table in your database:
 
 ```bash
-python manage.py migrate authz_data_sync
+python manage.py migrate fga_data_sync
 ```
 
 ## 2. Configuration
@@ -55,7 +55,7 @@ from celery.schedules import crontab
 
 app.conf.beat_schedule = {
     'fga-outbox-sweeper': {
-        'task': 'authz_data_sync.tasks.process_fga_outbox_batch',
+        'task': 'fga_data_sync.tasks.process_fga_outbox_batch',
         'schedule': crontab(minute='*/5'), # Sweep the Outbox every 5 minutes
     },
 }

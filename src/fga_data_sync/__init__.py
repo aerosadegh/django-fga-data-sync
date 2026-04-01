@@ -1,14 +1,14 @@
-# authz_data_sync/__init__.py
+# __init__.py
 
 __version__ = "0.1.0"
 
 
-def __getattr__(name):
+def __getattr__(name: str):
     """Lazy loading of exports to avoid Django app registry issues."""
-    if name == "AuthzSyncMixin":
-        from .mixins import AuthzSyncMixin
+    if name == "FGASyncMixin":
+        from .mixins import FGASyncMixin
 
-        return AuthzSyncMixin
+        return FGASyncMixin
     if name == "FGAViewMixin":
         from .mixins import FGAViewMixin
 
@@ -17,7 +17,8 @@ def __getattr__(name):
         from .permissions import IsFGAAuthorized
 
         return IsFGAAuthorized
+
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = ["AuthzSyncMixin", "FGAViewMixin", "IsFGAAuthorized", "__version__"]
+__all__ = ["FGASyncMixin", "FGAViewMixin", "IsFGAAuthorized", "__version__"]

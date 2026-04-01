@@ -1,4 +1,4 @@
-# authz_data_sync/middleware.py
+# fga_data_sync/middleware.py
 
 
 class TraefikIdentityMiddleware:
@@ -14,7 +14,7 @@ class TraefikIdentityMiddleware:
     Example:
         >>> # In settings.py
         >>> MIDDLEWARE = [
-        ...     "authz_data_sync.middleware.TraefikIdentityMiddleware",
+        ...     "fga_data_sync.middleware.TraefikIdentityMiddleware",
         ...     ...
         ... ]
         >>>

@@ -8,7 +8,7 @@ This section covers the core configuration logic and the infrastructure utilitie
 
 The configuration module is responsible for parsing the `AUTHZ_DATA_SYNC` dictionary defined in your core Django `settings.py` and falling back to sensible defaults.
 
-::: authz_data_sync.conf
+::: fga_data_sync.conf
     options:
       show_root_heading: false
       heading_level: 3
@@ -27,7 +27,7 @@ Under the hood, `get_fga_client()` fetches the necessary environment configurati
 
 **Performance Note:** It utilizes Python's `@lru_cache` to act as a thread-safe **Singleton**, ensuring the underlying HTTP connection pool is reused across requests for maximum performance.
 
-::: authz_data_sync.utils
+::: fga_data_sync.utils
     options:
       show_root_heading: false
       heading_level: 3
@@ -46,7 +46,7 @@ To maintain our **Clean Architecture** and strict layer separation, follow these
 ```python
 # services.py
 from openfga_sdk.client.models import ClientCheckRequest
-from authz_data_sync.utils import get_fga_client
+from fga_data_sync.utils import get_fga_client
 
 class DocumentService:
     def publish_document(self, document_id: str, user_id: str):

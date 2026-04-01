@@ -2,10 +2,10 @@
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from authz_data_sync.conf import get_setting
+from fga_data_sync.conf import get_setting
 
 # We need to bypass the conftest.py mock just for this file so we can test the real utility
-from authz_data_sync.utils import get_fga_client
+from fga_data_sync.utils import get_fga_client
 
 
 class TestConfigurationAndUtils:

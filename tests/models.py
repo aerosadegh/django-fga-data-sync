@@ -1,11 +1,11 @@
 # tests/models.py
 from django.db import models
 
-from authz_data_sync.mixins import AuthzSyncMixin
-from authz_data_sync.structs import FGACreatorConfig, FGAModelConfig, FGAParentConfig
+from fga_data_sync.mixins import FGASyncMixin
+from fga_data_sync.structs import FGACreatorConfig, FGAModelConfig, FGAParentConfig
 
 
-class MockOrganization(AuthzSyncMixin, models.Model):
+class MockOrganization(FGASyncMixin, models.Model):
     name = models.CharField(max_length=50)
     creator_id = models.CharField(max_length=50)
 
@@ -16,10 +16,10 @@ class MockOrganization(AuthzSyncMixin, models.Model):
 
     class Meta:
         # 🛠️ Explicitly attach this test model to our package's app registry
-        app_label = "authz_data_sync"
+        app_label = "fga_data_sync"
 
 
-class MockFolder(AuthzSyncMixin, models.Model):
+class MockFolder(FGASyncMixin, models.Model):
     name = models.CharField(max_length=50)
     org_id = models.CharField(max_length=50)
     creator_id = models.CharField(max_length=50)
@@ -38,4 +38,4 @@ class MockFolder(AuthzSyncMixin, models.Model):
 
     class Meta:
         # 🛠️ Explicitly attach this test model to our package's app registry
-        app_label = "authz_data_sync"
+        app_label = "fga_data_sync"

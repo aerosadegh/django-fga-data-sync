@@ -10,7 +10,7 @@ DEBUG = True
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
-    "authz_data_sync",
+    "fga_data_sync",
     # If you create mock models for testing (e.g., a fake Document model),
     # you would register that test app here.
 ]

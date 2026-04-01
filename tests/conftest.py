@@ -16,9 +16,9 @@ def mock_fga_client(mocker):
     mock_client.list_objects.return_value.objects = []
 
     # 🛠️ THE FIX: Mock the function in the namespaces where it is actually IMPORTED and USED.
-    mocker.patch("authz_data_sync.tasks.get_fga_client", return_value=mock_client)
-    mocker.patch("authz_data_sync.permissions.get_fga_client", return_value=mock_client)
-    mocker.patch("authz_data_sync.mixins.get_fga_client", return_value=mock_client)
+    mocker.patch("fga_data_sync.tasks.get_fga_client", return_value=mock_client)
+    mocker.patch("fga_data_sync.permissions.get_fga_client", return_value=mock_client)
+    mocker.patch("fga_data_sync.mixins.get_fga_client", return_value=mock_client)
 
     return mock_client
 

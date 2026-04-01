@@ -1,4 +1,4 @@
-# authz_data_sync/structs.py
+# fga_data_sync/structs.py
 from dataclasses import dataclass, field
 
 __all__ = [

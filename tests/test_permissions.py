@@ -5,8 +5,8 @@ import pytest
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from authz_data_sync.permissions import IsFGAAuthorized
-from authz_data_sync.structs import FGAViewConfig
+from fga_data_sync.permissions import IsFGAAuthorized
+from fga_data_sync.structs import FGAViewConfig
 
 from .models import MockFolder
 
@@ -173,7 +173,7 @@ class TestIsFGAAuthorized:
 
     def test_has_object_permission_action_mapping(self, api_rf, mock_fga_client):
         """Verifies custom ViewSet actions map to the correct FGA relation."""
-        from authz_data_sync.structs import FGAViewConfig
+        from fga_data_sync.structs import FGAViewConfig
 
         view = DummyProtectedView()
         view.action = "publish"
@@ -190,7 +190,7 @@ class TestIsFGAAuthorized:
 
     def test_has_object_permission_put_maps_to_update_relation(self, api_rf, mock_fga_client):
         """Verifies that PUT requests enforce the 'update_relation'."""
-        from authz_data_sync.structs import FGAViewConfig
+        from fga_data_sync.structs import FGAViewConfig
 
         view = DummyProtectedView()
         view.fga_config = FGAViewConfig(object_type="document", update_relation="editor")
@@ -211,7 +211,7 @@ class TestIsFGAAuthorized:
 
     def test_has_object_permission_patch_maps_to_update_relation(self, api_rf, mock_fga_client):
         """Verifies that PATCH requests also enforce the 'update_relation'."""
-        from authz_data_sync.structs import FGAViewConfig
+        from fga_data_sync.structs import FGAViewConfig
 
         view = DummyProtectedView()
         view.fga_config = FGAViewConfig(object_type="document", update_relation="editor")
@@ -229,7 +229,7 @@ class TestIsFGAAuthorized:
 
     def test_has_object_permission_delete_maps_to_delete_relation(self, api_rf, mock_fga_client):
         """Verifies that DELETE requests strictly enforce the 'delete_relation'."""
-        from authz_data_sync.structs import FGAViewConfig
+        from fga_data_sync.structs import FGAViewConfig
 
         view = DummyProtectedView()
         view.fga_config = FGAViewConfig(object_type="document", delete_relation="owner")

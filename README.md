@@ -17,14 +17,14 @@ Add it to your `INSTALLED_APPS` in `settings.py`:
 ```python
 INSTALLED_APPS = [
     # ... your other apps ...
-    'authz_data_sync',
+    'fga_data_sync',
 ]
 ```
 
 Run migrations to create the Outbox table in your database:
 
 ```bash
-python manage.py migrate authz_data_sync
+python manage.py migrate fga_data_sync
 ```
 
 ## ⚙️ Configuration
@@ -47,15 +47,15 @@ AUTHZ_DATA_SYNC = {
 
 ## 🚀 Usage
 
-To synchronize a Django model with OpenFGA, simply inherit from `AuthzSyncMixin` and define your `FGA_SETTINGS` dictionary. The package handles everything else automatically.
+To synchronize a Django model with OpenFGA, simply inherit from `FGASyncMixin` and define your `FGA_SETTINGS` dictionary. The package handles everything else automatically.
 
 ### Example: Defining Cascading Inheritance & Roles
 
 ```python
 from django.db import models
-from authz_data_sync.mixins import AuthzSyncMixin
+from fga_data_sync.mixins import FGASyncMixin
 
-class Document(AuthzSyncMixin, models.Model):
+class Document(FGASyncMixin, models.Model):
     title = models.CharField(max_length=255)
 
     # Soft references (No foreign keys required for Authz mapping!)
@@ -94,7 +94,7 @@ from celery.schedules import crontab
 
 app.conf.beat_schedule = {
     'fga-outbox-sweeper': {
-        'task': 'authz_data_sync.tasks.process_fga_outbox_batch',
+        'task': 'fga_data_sync.tasks.process_fga_outbox_batch',
         'schedule': crontab(minute='*/5'), # Sweep the Outbox every 5 minutes
     },
 }

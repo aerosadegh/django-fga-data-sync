@@ -1,7 +1,7 @@
 # tests/test_mixins.py
 import pytest
 
-from authz_data_sync.models import FGASyncOutbox
+from fga_data_sync.models import FGASyncOutbox
 
 from .models import MockFolder, MockOrganization
 
@@ -9,7 +9,7 @@ from .models import MockFolder, MockOrganization
 pytestmark = pytest.mark.django_db
 
 
-class TestAuthzSyncMixin:
+class TestFGASyncMixin:
     def test_tuple_generation_on_create(self):
         """Verifies that creating a new object queues the correct WRITE tuples."""
         folder = MockFolder.objects.create(
@@ -76,7 +76,7 @@ class TestAuthzSyncMixin:
         folder.fga_config = None
 
         with pytest.raises(ImproperlyConfigured) as exc:
-            folder._generate_authz_tuples()
+            folder._generate_fga_tuples()
         assert "must define a valid `fga_config`" in str(exc.value)
 
     def test_tuple_diffing_no_changes(self):

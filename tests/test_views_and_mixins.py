@@ -5,8 +5,8 @@ import pytest
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 
-from authz_data_sync.mixins import FGAViewMixin
-from authz_data_sync.models import FGASyncOutbox
+from fga_data_sync.mixins import FGAViewMixin
+from fga_data_sync.models import FGASyncOutbox
 from tests.models import MockFolder
 
 pytestmark = pytest.mark.django_db
@@ -150,7 +150,7 @@ class TestViewsAndMixins:
         """Tests the standalone FGAAuthorizedListMixin."""
         from rest_framework.views import APIView
 
-        from authz_data_sync.mixins import FGAAuthorizedListMixin
+        from fga_data_sync.mixins import FGAAuthorizedListMixin
 
         class DummyMixinListAPIView(FGAAuthorizedListMixin, APIView):
             fga_object_type = "folder"
@@ -175,7 +175,7 @@ class TestViewsAndMixins:
         """Verifies the mixin crashes if fga_object_type is not configured."""
         from rest_framework.views import APIView
 
-        from authz_data_sync.mixins import FGAAuthorizedListMixin
+        from fga_data_sync.mixins import FGAAuthorizedListMixin
 
         class BadMixinView(FGAAuthorizedListMixin, APIView):
             pass

@@ -1,8 +1,8 @@
 # tests/test_tasks.py
 import pytest
 
-from authz_data_sync.models import FGASyncOutbox
-from authz_data_sync.tasks import process_fga_outbox_batch
+from fga_data_sync.models import FGASyncOutbox
+from fga_data_sync.tasks import process_fga_outbox_batch
 
 pytestmark = pytest.mark.django_db
 
@@ -61,7 +61,7 @@ class TestProcessOutboxBatch:
         mock_fga_client.write.side_effect = Exception("FGA Server Down")
 
         # 2. Intercept Celery's retry mechanism so we can catch the exception safely
-        mocker.patch("authz_data_sync.tasks.process_fga_outbox_batch.retry", side_effect=Retry)
+        mocker.patch("fga_data_sync.tasks.process_fga_outbox_batch.retry", side_effect=Retry)
 
         with pytest.raises(Retry):
             process_fga_outbox_batch()
@@ -84,7 +84,7 @@ class TestProcessOutboxBatch:
         )
 
         mock_fga_client.write.side_effect = Exception("FGA Server Down")
-        mocker.patch("authz_data_sync.tasks.process_fga_outbox_batch.retry", side_effect=Retry)
+        mocker.patch("fga_data_sync.tasks.process_fga_outbox_batch.retry", side_effect=Retry)
 
         with pytest.raises(Retry):
             process_fga_outbox_batch()
