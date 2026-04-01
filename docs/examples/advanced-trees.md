@@ -47,12 +47,12 @@ class SecureHierarchyTreeAPIView(APIView):
     def get(self, request):
         fga_user = getattr(request, "fga_user", None)
         if not fga_user:
-            return Response({"error": "Missing identity."}, status=403)
+            return Response({"error": "Missing identity context."}, status=401)
 
         # STEP 1: Query OpenFGA for the allowed IDs (3 Fast Network Calls)
-        allowed_org_ids = self.get_fga_ids(fga_user, "organization", "member")
-        allowed_folder_ids = self.get_fga_ids(fga_user, "folder", "viewer")
-        allowed_doc_ids = self.get_fga_ids(fga_user, "document", "reader")
+        allowed_org_ids = self.get_fga_ids(fga_user, "organization", "can_list_org")
+        allowed_folder_ids = self.get_fga_ids(fga_user, "folder", "can_list_folder")
+        allowed_doc_ids = self.get_fga_ids(fga_user, "document", "can_read_document")
 
         # STEP 2: Filter the base querysets securely
         secure_docs = Document.objects.filter(id__in=allowed_doc_ids)
@@ -78,7 +78,7 @@ If you prefer using DRF's Generic Views to take advantage of built-in pagination
 
 ```python
 from rest_framework import generics
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import AuthenticationFailed
 from django.db.models import Prefetch
 from openfga_sdk.client.models import ClientListObjectsRequest
 from fga_data_sync.utils import get_fga_client
@@ -114,12 +114,12 @@ class SecureHierarchyTreeListAPIView(generics.ListAPIView):
         """
         fga_user = getattr(self.request, "fga_user", None)
         if not fga_user:
-            raise PermissionDenied("Missing identity context.")
+            raise AuthenticationFailed("Missing identity context.")
 
         # STEP 1: Query OpenFGA for the allowed IDs
-        allowed_org_ids = self.get_fga_ids(fga_user, "organization", "member")
-        allowed_folder_ids = self.get_fga_ids(fga_user, "folder", "viewer")
-        allowed_doc_ids = self.get_fga_ids(fga_user, "document", "reader")
+        allowed_org_ids = self.get_fga_ids(fga_user, "organization", "can_list_org")
+        allowed_folder_ids = self.get_fga_ids(fga_user, "folder", "can_list_folder")
+        allowed_doc_ids = self.get_fga_ids(fga_user, "document", "can_read_document")
 
         # STEP 2: Filter the base querysets securely
         secure_docs = Document.objects.filter(id__in=allowed_doc_ids)
@@ -166,9 +166,7 @@ class OrganizationNestedSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'folders']
 ```
 
-
 This ensures you execute only a few fast network calls and a few fast database queries, returning a 100% secure JSON tree.
-
 
 ### The OpenFGA Schema (DSL) Powering This View
 

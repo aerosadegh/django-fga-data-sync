@@ -5,7 +5,11 @@
 Install the package via pip or uv:
 
 ```bash
-uv add django-authz-data-sync
+pip install django-fga-data-sync
+```
+or
+```bash
+uv add django-fga-data-sync
 ```
 
 Add it to your `INSTALLED_APPS` and configure the Traefik middleware in your `settings.py`:
@@ -30,10 +34,10 @@ python manage.py migrate fga_data_sync
 
 ## 2. Configuration
 
-Configure the package by adding the `AUTHZ_DATA_SYNC` dictionary to your `settings.py`.
+Configure the package by adding the `FGA_DATA_SYNC` dictionary to your `settings.py`.
 
 ```python
-AUTHZ_DATA_SYNC = {
+FGA_DATA_SYNC = {
     # REQUIRED: The Store ID provisioned by the Central Auth Service
     "OPENFGA_STORE_ID": "01H...XYZ",
     # OPTIONAL: Defaults shown below

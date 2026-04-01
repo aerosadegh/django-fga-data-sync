@@ -190,31 +190,31 @@ flowchart TD
 ## Rules for Django Integration
 
 ### Rule 1: Models only assign ROLES.
-
-When configuring a Django Model's `FGA_SETTINGS`, the `creators` list must only assign base **Roles** (like `editor` or `owner`). Models should never directly assign permissions.
+When configuring a Django Model's `FGAModelConfig`, the `creators` list must only assign base **Roles** (like `editor` or `owner`). Models should never directly assign permissions.
 
 ```python
 # ❌ BAD: Assigning a permission directly
-"creators": [{"relation": "can_update", "local_field": "creator_id"}]
+FGACreatorConfig(relation="can_update", local_field="creator_id")
 
 # ✅ GOOD: Assigning a role
-"creators": [{"relation": "editor", "local_field": "creator_id"}]
+FGACreatorConfig(relation="editor", local_field="creator_id")
 ```
 
 ### Rule 2: Views only check PERMISSIONS.
-
-When configuring a DRF View's `FGA_VIEW_SETTINGS` (or using custom APIViews), the configuration must only check **Permissions** (like `can_read_document` or `can_update`). Views should never check roles.
+When configuring a DRF View's `FGAViewConfig`, the configuration must only check **Permissions** (like `can_read_document` or `can_update`). Views should never check roles.
 
 ```python
 # ❌ BAD: Checking a role directly
-FGA_VIEW_SETTINGS = {
-    "list_relation": "reader",
-    "detail_relations": {"PUT": "editor"}
-}
+FGAViewConfig(
+    object_type="document",
+    read_relation="reader",
+    update_relation="editor"
+)
 
 # ✅ GOOD: Checking a permission
-FGA_VIEW_SETTINGS = {
-    "list_relation": "can_read_document",
-    "detail_relations": {"PUT": "can_update"}
-}
+FGAViewConfig(
+    object_type="document",
+    read_relation="can_read_document",
+    update_relation="can_update"
+)
 ```

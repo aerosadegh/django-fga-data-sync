@@ -1,6 +1,6 @@
-# 🏗️ Project Architecture & Philosophy: Django Authz Data Sync
+# 🏗️ Project Architecture & Philosophy: Django FGA Data Sync
 
-This document outlines the core philosophy behind the `django-authz-data-sync` package, why it was created, and the architectural patterns it leverages to provide enterprise-grade authorization for Django developers.
+This document outlines the core philosophy behind the `django-fga-data-sync` package, why it was created, and the architectural patterns it leverages to provide enterprise-grade authorization for Django developers.
 
 ## 1. Why We Built This Project
 
@@ -8,7 +8,7 @@ In a standard Django application, authorization logic (checking if a user can re
 
 Furthermore, as systems scale into microservices, relying solely on the Django ORM for permissions becomes impossible.
 
-We built `django-authz-data-sync` to solve these problems by adopting the **Google Zanzibar** model via **OpenFGA**. The core philosophy is **100% Decoupling**: your application should not evaluate permissions; it should merely ask a dedicated authorization engine for the answer.
+We built `django-fga-data-sync` to solve these problems by adopting the **Google Zanzibar** model via **OpenFGA**. The core philosophy is **100% Decoupling**: your application should not evaluate permissions; it should merely ask a dedicated authorization engine for the answer.
 
 ## 2. The Core Architectural Patterns
 

@@ -1,6 +1,6 @@
-# Django Authz Data Sync 🤠
+# Django FGA Data Sync
 
-A declarative, Outbox-pattern OpenFGA synchronizer for Django models.
+A declarative, strictly-typed, Outbox-pattern OpenFGA synchronizer for Django models.
 
 This package automatically translates your Django relational models into OpenFGA authorization graph tuples. It guarantees perfect synchronization between your local PostgreSQL database and your distributed OpenFGA server using the Transactional Outbox pattern and Celery.
 
@@ -9,7 +9,7 @@ This package automatically translates your Django relational models into OpenFGA
 Install the package via pip or uv:
 
 ```bash
-pip install django-authz-data-sync
+pip install django-fga-data-sync
 ```
 
 Add it to your `INSTALLED_APPS` in `settings.py`:
@@ -45,44 +45,46 @@ AUTHZ_DATA_SYNC = {
 }
 ```
 
-## 🚀 Usage
+## 💡 Usage
 
-To synchronize a Django model with OpenFGA, simply inherit from `FGASyncMixin` and define your `FGA_SETTINGS` dictionary. The package handles everything else automatically.
+To synchronize a Django model with OpenFGA, simply inherit from `FGASyncMixin` and define your `fga_config` using the `FGAModelConfig` dataclass. The package handles everything else automatically.
 
 ### Example: Defining Cascading Inheritance & Roles
 
 ```python
 from django.db import models
+from typing import ClassVar
 from fga_data_sync.mixins import FGASyncMixin
+from fga_data_sync.structs import FGAModelConfig, FGAParentConfig, FGACreatorConfig
 
 class Document(FGASyncMixin, models.Model):
     title = models.CharField(max_length=255)
 
-    # Soft references (No foreign keys required for Authz mapping!)
+    # Soft references (No foreign keys required for FGA mapping!)
     folder_id = models.UUIDField()
     creator_id = models.UUIDField()
 
-    FGA_SETTINGS = {
-        "object_type": "document",
-        "parents": [
-            {
-                "relation": "folder",           # OpenFGA relation
-                "parent_type": "folder",        # OpenFGA parent type
-                "local_field": "folder_id"      # Django model field
-            }
+    fga_config: ClassVar[FGAModelConfig] = FGAModelConfig(
+        object_type="document",
+        parents=[
+            FGAParentConfig(
+                relation="folder",           # OpenFGA relation
+                parent_type="folder",        # OpenFGA parent type
+                local_field="folder_id"      # Django model field
+            )
         ],
-        "creators": [
-            {
-                "relation": "editor",           # OpenFGA explicit role
-                "local_field": "creator_id"     # Django model field
-            }
+        creators=[
+            FGACreatorConfig(
+                relation="editor",           # OpenFGA explicit role
+                local_field="creator_id"     # Django model field
+            )
         ]
-    }
+    )
 ```
 
 Whenever you call `Document.objects.create()`, `document.save()`, or `document.delete()`, the mixin will automatically calculate the graph diffs, queue the tuples in the local Outbox table, and trigger the Celery worker to push them to OpenFGA asynchronously.
 
-## 👷 Celery Configuration
+## 🕸️ Celery Configuration
 
 Because this package uses the Transactional Outbox pattern, you must have Celery configured in your project to process the queued network requests.
 
@@ -99,6 +101,3 @@ app.conf.beat_schedule = {
     },
 }
 ```
-
-## 📄 License
-MIT License

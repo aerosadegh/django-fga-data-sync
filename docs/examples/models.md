@@ -1,6 +1,6 @@
 # Syncing Models to OpenFGA
 
-To synchronize a Django model with OpenFGA, simply inherit from `FGASyncMixin` and define your `FGA_SETTINGS` dictionary. The package handles everything else automatically.
+To synchronize a Django model with OpenFGA, simply inherit from `FGASyncMixin` and define your `fga_config` using the `FGAModelConfig` dataclass. The package handles everything else automatically.
 
 ### Example: Defining Cascading Inheritance & Roles
 
@@ -8,38 +8,39 @@ To synchronize a Django model with OpenFGA, simply inherit from `FGASyncMixin` a
 # models.py
 from django.db import models
 from fga_data_sync.mixins import FGASyncMixin
+from fga_data_sync.structs import FGAModelConfig, FGAParentConfig, FGACreatorConfig
 from typing import ClassVar
 
 class Organization(FGASyncMixin, models.Model):
     name = models.CharField(max_length=255)
     creator_id = models.UUIDField()
 
-    FGA_SETTINGS: ClassVar[dict] = {
-        "object_type": "organization",
-        "parents": [], # Top level entity (or link to platform if desired)
-        "creators": [
-            {"relation": "admin", "local_field": "creator_id"}
-        ]
-    }
+    fga_config: ClassVar[FGAModelConfig] = FGAModelConfig(
+        object_type="organization",
+        creators=[FGACreatorConfig(relation="admin", local_field="creator_id")]
+    )
 
 class Folder(FGASyncMixin, models.Model):
     name = models.CharField(max_length=255)
     organization_id = models.UUIDField()
     creator_id = models.UUIDField()
 
-    FGA_SETTINGS: ClassVar[dict] = {
-        "object_type": "folder",
-        "parents": [
-            {
-                "relation": "organization",
-                "parent_type": "organization",
-                "local_field": "organization_id"
-            }
+    fga_config: ClassVar[FGAModelConfig] = FGAModelConfig(
+        object_type="folder",
+        parents=[
+            FGAParentConfig(
+                relation="organization",
+                parent_type="organization",
+                local_field="organization_id"
+            )
         ],
-        "creators": [
-            {"relation": "owner", "local_field": "creator_id"}
+        creators=[
+            FGACreatorConfig(
+                relation="owner",
+                local_field="creator_id"
+            )
         ]
-    }
+    )
 
 class Document(FGASyncMixin, models.Model):
     title = models.CharField(max_length=255)
@@ -47,19 +48,22 @@ class Document(FGASyncMixin, models.Model):
     folder_id = models.UUIDField()
     creator_id = models.UUIDField()
 
-    FGA_SETTINGS: ClassVar[dict] = {
-        "object_type": "document",
-        "parents": [
-            {
-                "relation": "folder",
-                "parent_type": "folder",
-                "local_field": "folder_id"
-            }
+    fga_config: ClassVar[FGAModelConfig] = FGAModelConfig(
+        object_type="document",
+        parents=[
+            FGAParentConfig(
+                relation="folder",
+                parent_type="folder",
+                local_field="folder_id"
+            )
         ],
-        "creators": [
-            {"relation": "editor", "local_field": "creator_id"}
+        creators=[
+            FGACreatorConfig(
+                relation="editor",
+                local_field="creator_id"
+            )
         ]
-    }
+    )
 ```
 
 Whenever you call `Document.objects.create()`, `document.save()`, or `document.delete()`, the mixin will automatically calculate the graph diffs, queue the tuples in the local Outbox table, and trigger the Celery worker to push them to OpenFGA asynchronously.
@@ -67,7 +71,7 @@ Whenever you call `Document.objects.create()`, `document.save()`, or `document.d
 ---
 
 ## 1. The Tuple Mapping (Graph)
-This diagram shows how the `FGA_SETTINGS` dictionary acts as a translation layer, reading soft-reference `UUIDs` from your Django Model and converting them into strict Zanzibar Tuples.
+This diagram shows how the `FGAModelConfig` dataclass acts as a translation layer, reading soft-reference `UUIDs` from your Django Model and converting them into strict Zanzibar Tuples.
 
 ```mermaid
 %%{
@@ -89,7 +93,7 @@ graph LR
         D --- C
     end
 
-    subgraph FGA_SETTINGS
+    subgraph FGAModelConfig
         P_Map[Parents Definition<br/>relation: 'folder'<br/>parent_type: 'folder']:::mapping
         C_Map[Creators Definition<br/>relation: 'editor']:::mapping
         F -.->|local_field| P_Map
@@ -125,7 +129,7 @@ sequenceDiagram
 
     rect rgb(240, 248, 255)
         Note over Mixin, DB: Atomic Database Transaction
-        Mixin->>Mixin: Calculate Tuples from FGA_SETTINGS
+        Mixin->>Mixin: Calculate Tuples from FGAModelConfig
         Mixin->>DB: BEGIN TRANSACTION
         DB->>DB: Save Document Data
         Mixin->>DB: Insert into FGASyncOutbox (Status: Pending)
@@ -149,17 +153,16 @@ sequenceDiagram
 
 If you need to inject custom business logic or manipulate tuples in the middle of the process, you have three clean "escape hatches" depending on where the data originates.
 
-### Method 1: The Model Level (Overriding `_generate_fga_tuples`)
+### Method 1: The Model Level (Overriding `save`)
 
-If the custom role assignment is tied directly to the data state of the model (for example, making a document "Public" based on a boolean field), you should intercept the package's tuple generator directly in your `models.py`.
-
-The `FGASyncMixin` relies on a method called `_generate_fga_tuples()`. You can simply call `super()` to get the standard tuples, manipulate the list, and return it!
+If the custom role assignment is tied directly to the data state of the model (for example, making a document "Public" based on a boolean field), you should intercept the `save()` method. Because we use the Outbox pattern, you can queue tuples manually using `self._queue_outbox`.
 
 ```python
 # models.py
 from django.db import models
 from fga_data_sync.mixins import FGASyncMixin
-from typing import ClassVar
+from fga_data_sync.models import FGASyncOutbox
+from fga_data_sync.structs import FGAModelConfig
 
 class Document(FGASyncMixin, models.Model):
     title = models.CharField(max_length=255)
@@ -169,23 +172,24 @@ class Document(FGASyncMixin, models.Model):
     # Let's say we have a custom boolean field
     is_public = models.BooleanField(default=False)
 
-    FGA_SETTINGS: ClassVar[dict] = { ... standard config ... }
+    fga_config = FGAModelConfig(...) # Define standard config here
 
-    def _generate_fga_tuples(self) -> list[dict]:
-        # 1. Grab the standard tuples generated by the Mixin's FGA_SETTINGS
-        tuples = super()._generate_fga_tuples()
+    def save(self, *args, **kwargs):
+        # 1. Let the mixin handle the standard config-based tuples
+        super().save(*args, **kwargs)
 
         # 2. Inject your custom, dynamic logic!
         if self.is_public:
-            tuples.append({
-                "user": "user:*",                 # OpenFGA wildcard for "everyone"
-                "relation": "reader",             # The role to assign
-                "object": f"document:{self.id}"   # This specific document
-            })
-
-        return tuples
+            self._queue_outbox(
+                action=FGASyncOutbox.Action.WRITE.value,
+                t={
+                    "user": "user:*",                 # OpenFGA wildcard for "everyone"
+                    "relation": "reader",             # The role to assign
+                    "object": f"document:{self.pk}"   # This specific document
+                }
+            )
 ```
-> **Note:** Because the mixin automatically calculates diffs on `.save()`, if you change `is_public` from True to False, the mixin will automatically issue a `DELETE` action for that tuple!
+> **Note:** Because the mixin automatically calculates diffs based on the original state versus the new state, custom manual tuples like the one above will need to be manually deleted if `is_public` reverts to `False`.
 
 ### Method 2: The View Level (Using DRF `perform_create`)
 
@@ -206,7 +210,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     permission_classes = [IsFGAAuthorized]
-    # ... standard fga variables ...
+    # ... standard fga_config variables ...
 
     def perform_create(self, serializer):
         # 1. Save the document normally.
@@ -221,7 +225,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         # 3. Manually queue custom tuples into the Outbox!
         for editor_id in extra_editors:
             FGASyncOutbox.objects.create(
-                action=FGASyncOutbox.Action.WRITE,
+                action=FGASyncOutbox.Action.WRITE.value,
                 user_id=f"user:{editor_id}",
                 relation="editor",
                 object_id=f"document:{document.id}"
@@ -253,13 +257,14 @@ class InviteManagerAPIView(APIView):
 
         # 2. Manually queue the new Role Assignment directly into the Outbox!
         FGASyncOutbox.objects.create(
-            action="WRITE",
+            action=FGASyncOutbox.Action.WRITE.value,
             user_id=f"user:{new_manager_id}",
             relation="manager",
             object_id=f"organization:{org_id}"
         )
+
         # The transaction.on_commit hook is generally tied to the mixin,
-        # so for raw creation, you can manually trigger the Celery worker to wake up immediately:
+        # so for raw creation outside of a model save, you can manually trigger the Celery worker to wake up immediately:
         from fga_data_sync.tasks import process_fga_outbox_batch
         process_fga_outbox_batch.delay()
 
