@@ -1,6 +1,8 @@
 # tests/test_mixins.py
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
+from fga_data_sync.adapters import FGATupleAdapter
 from fga_data_sync.models import FGASyncOutbox
 
 from .models import MockFolder, MockOrganization
@@ -66,9 +68,8 @@ class TestFGASyncMixin:
         assert task.user_id == "user:admin_1"
         assert task.object_id == f"organization:{org_id}"
 
-    def test_authz_sync_mixin_missing_config(self):
+    def test_fga_sync_mixin_missing_config(self):
         """Verifies an ImproperlyConfigured error is raised if fga_config is invalid."""
-        from django.core.exceptions import ImproperlyConfigured
 
         folder = MockFolder(name="Test", org_id="org1", creator_id="user1")
 
@@ -76,8 +77,10 @@ class TestFGASyncMixin:
         folder.fga_config = None
 
         with pytest.raises(ImproperlyConfigured) as exc:
-            folder._generate_fga_tuples()
-        assert "must define a valid `fga_config`" in str(exc.value)
+            # Call the adapter directly, just as the mixin would
+            FGATupleAdapter.generate_tuples(folder, folder.fga_config)
+
+        assert "provided an invalid `fga_config`" in str(exc.value)
 
     def test_tuple_diffing_no_changes(self):
         """Verifies that saving an object without changing FGA relations queues nothing."""

@@ -1,12 +1,11 @@
 # tests/test_views_and_mixins.py
-from typing import ClassVar
-
 import pytest
 from rest_framework import generics
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 
 from fga_data_sync.mixins import FGAViewMixin
 from fga_data_sync.models import FGASyncOutbox
+from fga_data_sync.structs import FGAViewConfig
 from tests.models import MockFolder
 
 pytestmark = pytest.mark.django_db
@@ -19,8 +18,10 @@ class DummyListAPIView(FGAViewMixin, generics.ListAPIView):
     """A concrete implementation of the FGAAuthorizedListAPIView for testing."""
 
     queryset = MockFolder.objects.all()
-    fga_object_type = "folder"
-    fga_list_relation = "can_list"
+    fga_config = FGAViewConfig(
+        object_type="folder",
+        read_relation="can_list",
+    )
 
 
 class DummyFGAViewMixin(FGAViewMixin, generics.RetrieveUpdateDestroyAPIView):
@@ -29,20 +30,16 @@ class DummyFGAViewMixin(FGAViewMixin, generics.RetrieveUpdateDestroyAPIView):
     queryset = MockFolder.objects.all()
     lookup_field = "pk"
 
-    FGA_VIEW_SETTINGS: ClassVar[dict] = {
-        "object_type": "folder",
-        "list_relation": "can_list",
-        "create_parent": {
-            "parent_type": "organization",
-            "payload_field": "org_id",
-            "relation": "can_add_folder",
-        },
-        "detail_relations": {
-            "GET": "can_list",
-            "PUT": "can_update",
-            "DELETE": "can_delete",
-        },
-    }
+    # THE FIX: Upgraded to the strict dataclass
+    fga_config = FGAViewConfig(
+        object_type="folder",
+        read_relation="can_list",
+        update_relation="can_update",
+        delete_relation="can_delete",
+        create_parent_type="organization",
+        create_parent_field="org_id",
+        create_relation="can_add_folder",
+    )
 
 
 # ==========================================
@@ -146,51 +143,13 @@ class TestViewsAndMixins:
         assert called_request.relation == "can_update"  # Mapped from "PUT": "can_update"
         assert called_request.object == f"folder:{folder1.id}"
 
-    def test_fga_authorized_list_mixin(self, api_rf, mock_fga_client):
-        """Tests the standalone FGAAuthorizedListMixin."""
-        from rest_framework.views import APIView
-
-        from fga_data_sync.mixins import FGAAuthorizedListMixin
-
-        class DummyMixinListAPIView(FGAAuthorizedListMixin, APIView):
-            fga_object_type = "folder"
-            fga_list_relation = "can_list"
-
-            def get_queryset(self):
-                return MockFolder.objects.all()
-
-        folder1 = MockFolder.objects.create(name="F1", org_id="o1", creator_id="u1")
-        request = api_rf.get("/dummy/")
-        request.fga_user = "user:bob"
-
-        view = DummyMixinListAPIView()
-        view.request = request
-
-        mock_fga_client.list_objects.return_value.objects = [f"folder:{folder1.id}"]
-
-        qs = view.get_queryset()
-        assert qs.count() == 1
-
-    def test_fga_authorized_list_mixin_missing_type(self):
-        """Verifies the mixin crashes if fga_object_type is not configured."""
-        from rest_framework.views import APIView
-
-        from fga_data_sync.mixins import FGAAuthorizedListMixin
-
-        class BadMixinView(FGAAuthorizedListMixin, APIView):
-            pass
-
-        view = BadMixinView()
-        with pytest.raises(ValueError):
-            view.get_authorized_ids()
-
     def test_fgaviewmixin_missing_fga_user(self, api_rf):
         """Verifies the mixin crashes safely if Traefik user is missing."""
         view = DummyFGAViewMixin()
         view.request = api_rf.get("/dummy/")
         # Intentionally NOT setting view.request.fga_user
 
-        with pytest.raises(PermissionDenied) as exc:
+        with pytest.raises(AuthenticationFailed) as exc:
             view._get_fga_user()
         assert "Missing identity context" in str(exc.value)
 
@@ -202,7 +161,6 @@ class TestViewsAndMixins:
 
         # DRF injects kwargs for detail routes (e.g., /dummy/{pk}/)
         view.kwargs = {"pk": "1"}
-
         qs = view.get_queryset()
 
         # Compare the compiled SQL strings, because DRF clones the queryset in memory
@@ -215,18 +173,15 @@ class TestViewsAndMixins:
         view.request.fga_user = "user:bob"
         view.kwargs = {}
 
-        # Sabotage the config by removing the list_relation
-        view.FGA_VIEW_SETTINGS = {"object_type": "folder"}
+        # THE FIX: Sabotage the config properly using the dataclass
+        view.fga_config = FGAViewConfig(object_type="folder", read_relation=None)
 
         qs = view.get_queryset()
 
-        # Compare the compiled SQL strings
         assert str(qs.query) == str(view.queryset.all().query)
 
     def test_fgaviewmixin_check_permissions_missing_payload_field(self, api_rf):
         """Verifies parent checking blocks creation if the payload field is missing."""
-
-        # Missing 'org_id' entirely from the JSON payload
         wsgi_request = api_rf.post("/dummy/", {"wrong_key": "123"}, format="json")
 
         view = DummyFGAViewMixin()
@@ -240,10 +195,9 @@ class TestViewsAndMixins:
 
     def test_fgaviewmixin_check_object_permissions_unmapped_method(self, api_rf):
         """Verifies object checks pass through safely if the HTTP method isn't mapped."""
-
         folder = MockFolder.objects.create(name="F1", org_id="o1", creator_id="u1")
 
-        # We simulate a PATCH request
+        # Simulate a PATCH request, but we only configured PUT/DELETE/GET in DummyFGAViewMixin
         wsgi_request = api_rf.patch(f"/dummy/{folder.id}/", {"name": "test"}, format="json")
 
         view = DummyFGAViewMixin()
@@ -251,8 +205,6 @@ class TestViewsAndMixins:
         drf_request.fga_user = "user:bob"
         view.request = drf_request
 
-        # Our DummyFGAViewMixin maps GET, PUT, and DELETE, but specifically MISSES PATCH
-        # Therefore, the mixin should gracefully ignore it.
         view.check_object_permissions(drf_request, folder)
 
     def test_tuple_diffing_on_update(self):

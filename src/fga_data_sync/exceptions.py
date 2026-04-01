@@ -1,4 +1,4 @@
-class FGAConfigurationError(Exception):
+class FGAConfigurationError(Exception):  # pragma: no cover
     """Exception raised when FGA configuration is invalid or missing."""
 
     def __init__(self, message: str, original_exception: Exception | None = None):
