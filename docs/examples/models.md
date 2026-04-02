@@ -17,7 +17,12 @@ class Organization(FGAModelSyncMixin, models.Model):
 
     fga_config: ClassVar[FGAModelConfig] = FGAModelConfig(
         object_type="organization",
-        creators=[FGACreatorConfig(relation="admin", local_field="creator_id")]
+        creators=[
+            FGACreatorConfig(
+                relation="admin",
+                local_field="creator_id"
+            )
+        ]
     )
 
 class Folder(FGAModelSyncMixin, models.Model):
@@ -153,7 +158,8 @@ sequenceDiagram
 
 If you need to inject custom business logic or manipulate tuples in the middle of the process, you have three clean "escape hatches" depending on where the data originates.
 
-### Method 1: The Model Level (Overriding `save`)
+### Method 1: The Model Level
+> Overriding `save`
 
 If the custom role assignment is tied directly to the data state of the model (for example, making a document "Public" based on a boolean field), you should intercept the `save()` method. Because we use the Outbox pattern, you can queue tuples manually using `self._queue_outbox`.
 
@@ -191,7 +197,8 @@ class Document(FGAModelSyncMixin, models.Model):
 ```
 > **Note:** Because the mixin automatically calculates diffs based on the original state versus the new state, custom manual tuples like the one above will need to be manually deleted if `is_public` reverts to `False`.
 
-### Method 2: The View Level (Using DRF `perform_create`)
+### Method 2: The View Level
+> Using DRF `perform_create`
 
 If the custom role assignment comes from the HTTP Request (for example, a user selects 3 co-workers in a dropdown to co-author a document), you should handle this in the DRF View using `perform_create`.
 
@@ -235,7 +242,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
         # and Celery sweeps up BOTH the mixin's tuples and your custom tuples at the same time!
 ```
 
-### Method 3: Direct Outbox Manipulation (The "Escape Hatch")
+### Method 3: Direct Outbox Manipulation
+> The "Escape Hatch"
 
 Sometimes, you need to assign a role completely outside the standard Model creation lifecycle. For example, you are building an "Invite User" view where an existing `Organization` admin invites a new user as a `manager`.
 

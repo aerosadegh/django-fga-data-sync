@@ -1,8 +1,10 @@
-site_name: Django Authz Data Sync
+site_name: Django FGA Data Sync
 site_description: Enterprise OpenFGA integration for Django.
-site_author: "Your Org"
-repo_url: https://github.com/your-org/django-authz-data-sync
-repo_name: "your-org/django-authz-data-sync"
+site_author: "Sadegh Yazdani"
+site_url: https://django-fga-data-sync.readthedocs.io
+repo_url: https://github.com/aerosadegh/django-fga-data-sync
+repo_name: "aerosadegh/django-fga-data-sync"
+edit_uri: edit/main/docs/
 
 theme:
   name: material
@@ -15,15 +17,15 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: indigo
-      accent: blue
+      primary: teal        # A modern nod to Django's green
+      accent: deep purple  # A nod to OpenFGA's violet
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: indigo
-      accent: blue
+      primary: teal
+      accent: deep purple
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -41,30 +43,52 @@ theme:
     # Search upgrades
     - search.suggest # Auto-suggests while typing in the search bar
     - search.highlight # Highlights the search terms on the page
+    - search.share
 
     # Code block upgrades
     - content.code.copy # Copy button
     - content.code.annotate # Allows you to add beautiful inline annotations to code!
     - content.tabs.link # If you click a "Python" tab on one code block, it switches all code blocks to Python
 
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+    previous: fontawesome/solid/angle-left
+    next: fontawesome/solid/angle-right
+
 plugins:
-  - search
+  - search:
+      separator: '[\s-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
   - mkdocstrings:
       handlers:
         python:
           paths: [src]
           options:
-            docstring_style: google # Renders your Python docstrings beautifully
+            docstring_style: google
+            show_source: true
             show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
+            show_if_no_docstring: false
+            inherited_members: true
+            members_order: source
+            group_by_category: true
+            show_category_heading: true
+
+
 
 markdown_extensions:
   # 🤠 The magic formatting tools!
   - admonition # Enables callout blocks (!!! info, !!! warning, !!! danger)
   - attr_list
+  - footnotes
   - md_in_html
+  - tables
   - pymdownx.tasklist:
       custom_checkbox: true
-  - tables
   - pymdownx.details # Allows you to make admonitions collapsible (??? info)
   - pymdownx.superfences
   - pymdownx.tabbed: # Enables tabbed content inside your markdown pages
@@ -109,9 +133,22 @@ nav:
     - Nested Hierarchies: examples/advanced-trees.md
 
   - API Reference:
+    - Configuration: api/configs.md
     - Mixins: api/mixins.md
     - Permissions: api/permissions.md
     - Settings: api/settings.md
+
+
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/aerosadegh/django-fga-data-sync
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/django-fga-data-sync/
+  version:
+    provider: mike
+  copyright: Copyright © 2026 Sadegh Yazdani. Licensed under GPL-3.0.
 
 
 extra_javascript:

@@ -1,5 +1,7 @@
 # fga_data_sync/mixins.py
+import logging
 import uuid
+import warnings
 from typing import Any, ClassVar
 
 from django.core.exceptions import ImproperlyConfigured
@@ -18,6 +20,9 @@ __all__ = [
     "FGAModelSyncMixin",
     "FGAViewMixin",
 ]
+
+
+logger = logging.getLogger(__name__)
 
 
 class FGAModelSyncMixin:
@@ -90,6 +95,25 @@ class FGAViewMixin:
     request: Request
     kwargs: dict[str, Any]
     lookup_field: str
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+        # 🛡️ THE GUARDRAIL: Check for duplicate authorization strategies
+        from fga_data_sync.permissions import IsFGAAuthorized
+
+        permission_classes = getattr(self, "permission_classes", [])
+        if IsFGAAuthorized in permission_classes:
+            msg = (
+                f"Duplicate FGA Authorization detected on '{self.__class__.__name__}'. "
+                f"You are using both FGAViewMixin and IsFGAAuthorized. "
+                f"This will result in redundant network calls to OpenFGA. "
+                f"Please remove IsFGAAuthorized from permission_classes."
+            )
+            # Log as a warning to the console
+            logger.warning(msg)
+            # Optionally, trigger a runtime warning that shows up in the dev server output
+            warnings.warn(msg, UserWarning, stacklevel=2)
 
     def _get_fga_user(self) -> str:
         fga_user = getattr(self.request, "fga_user", None)

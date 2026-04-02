@@ -174,4 +174,4 @@ For the Python code above to work flawlessly, your OpenFGA schema must follow th
 
 Notice how the generic views do **not** check if the user is an `admin` or an `editor`. They strictly check the **Permissions** (`can_list_org`, `can_list_folder`, `can_read_document`), allowing the OpenFGA graph to calculate all the complex role inheritance automatically.
 
-👉 **[See the Schema Design Guide](/schema/design-guide/#complete-example-cascading-hierarchy) for the exact OpenFGA DSL required to power this view.**
+👉 **[See the Schema Design Guide](../schema/design-guide.md#complete-example-cascading-hierarchy) for the exact OpenFGA DSL required to power this view.**

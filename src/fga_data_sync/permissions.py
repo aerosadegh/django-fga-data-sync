@@ -6,6 +6,7 @@ from openfga_sdk.client.models import ClientCheckRequest
 from rest_framework import permissions
 from rest_framework.request import Request
 from rest_framework.views import APIView
+from rest_framework.viewsets import ViewSetMixin
 
 from .structs import FGAViewConfig
 from .utils import get_fga_client
@@ -20,8 +21,8 @@ class FGAConfiguredView(Protocol):
     action: str | None = None
 
 
-UPDATE_METHODS = {"PUT", "PATCH"}
-DELETE_METHOD = "DELETE"
+UPDATE_METHODS: set[str] = {"PUT", "PATCH"}
+DELETE_METHOD: str = "DELETE"
 
 
 class IsFGAAuthorized(permissions.BasePermission):
@@ -45,6 +46,14 @@ class IsFGAAuthorized(permissions.BasePermission):
                 f"View '{view.__class__.__name__}' using IsFGAAuthorized must "
                 f"define an `fga_config` attribute of type `FGAViewConfig`."
             )
+
+        if config.action_relations and not isinstance(view, ViewSetMixin):
+            raise ImproperlyConfigured(
+                f"View '{view.__class__.__name__}' defines 'action_relations' in its "
+                f"FGAViewConfig, but it is not a ViewSet. Standard Generic Views do not support "
+                f"@action decorators. Either convert this view to a ViewSet, or remove "
+                f"'action_relations' from the config."
+            )
         return config
 
     def has_permission(self, request: Request, view: APIView | FGAConfiguredView) -> bool:
@@ -67,12 +76,12 @@ class IsFGAAuthorized(permissions.BasePermission):
         # Handle POST (Creation) Parent Checks
         if request.method == "POST" and config.create_parent_type:
             # Type hint resolution: __post_init__ guarantees these are strings if one exists
-            parent_id: str | None = request.data.get(str(config.create_parent_field))
+            parent_field = str(config.create_parent_field)
+            parent_id: str | None = request.data.get(parent_field)
 
             if not parent_id:
                 logger.warning(
-                    f"FGA Authorization denied: Missing parent field "
-                    f"'{config.create_parent_field}' in payload."
+                    f"FGA Authorization denied: Missing parent field '{parent_field}' in payload."
                 )
                 return False
 
@@ -97,54 +106,72 @@ class IsFGAAuthorized(permissions.BasePermission):
     ) -> bool:
         """Validates fine-grained object access based on HTTP method or ViewSet action.
 
+        If the corresponding relation in the view's FGAViewConfig is explicitly set
+        to None, this check is bypassed and access is automatically granted, adhering
+        to the documented opt-out contract.
+
         Args:
             request: The incoming HTTP request.
             view: The DRF view instance.
             obj: The database object being accessed.
 
         Returns:
-            bool: True if the user holds the required relation on the object, False otherwise.
+            bool: True if the user holds the required relation on the object (or if the
+                  check is explicitly disabled), False otherwise.
         """
         config = self._get_config(view)
-        relation: str | None = None
+        required_relation: str | None = None
+        is_relation_mapped: bool = False
 
         # 1. Resolve relation via Custom ViewSet Action
         view_action: str | None = getattr(view, "action", None)
-        if view_action:
-            relation = config.action_relations.get(view_action)
+        if view_action and view_action in config.action_relations:
+            required_relation = config.action_relations.get(view_action)
+            is_relation_mapped = True
 
         # 2. Resolve relation via Standard HTTP Methods
-        if not relation:
+        if not is_relation_mapped:
             if request.method in permissions.SAFE_METHODS:
-                relation = config.read_relation
+                required_relation = config.read_relation
+                is_relation_mapped = True
             elif request.method in UPDATE_METHODS:
-                relation = config.update_relation
+                required_relation = config.update_relation
+                is_relation_mapped = True
             elif request.method == DELETE_METHOD:
-                relation = config.delete_relation
+                required_relation = config.delete_relation
+                is_relation_mapped = True
 
-        if relation:
-            fga_user: str | None = getattr(request, "fga_user", None)
-            if not fga_user:
+        # If the HTTP method wasn't mapped at all (e.g., TRACE, CONNECT), deny by default.
+        if not is_relation_mapped:
+            logger.warning(f"FGA Authorization denied: Unmapped HTTP method '{request.method}'.")
+            return False
+
+        # 3. Handle Explicit Opt-Out (Relation is mapped, but explicitly set to None)
+        if required_relation is None:
+            return True
+
+        # 4. Perform FGA Network Check
+        fga_user: str | None = getattr(request, "fga_user", None)
+        if not fga_user:
+            logger.warning("FGA Authorization denied: No 'fga_user' found on request.")
+            return False
+
+        try:
+            # Defensive lookup for object identifier
+            object_id = getattr(obj, "id", getattr(obj, "pk", None))
+            if not object_id:
+                logger.error(f"Authorization target {obj} lacks an 'id' or 'pk' attribute.")
                 return False
 
-            try:
-                # Defensive lookup for object identifier
-                object_id = getattr(obj, "id", getattr(obj, "pk", None))
-                if not object_id:
-                    logger.error(f"Authorization target {obj} lacks an 'id' or 'pk' attribute.")
-                    return False
-
-                client = get_fga_client()
-                response = client.check(
-                    ClientCheckRequest(
-                        user=fga_user,
-                        relation=relation,
-                        object=f"{config.object_type}:{object_id}",
-                    )
+            client = get_fga_client()
+            response = client.check(
+                ClientCheckRequest(
+                    user=fga_user,
+                    relation=required_relation,
+                    object=f"{config.object_type}:{object_id}",
                 )
-                return bool(response.allowed)
-            except (ValueError, AttributeError, ConnectionError, TimeoutError) as e:
-                logger.error(f"FGA network or validation error during object check: {e}")
-                return False
-
-        return False
+            )
+            return bool(response.allowed)
+        except (ValueError, AttributeError, ConnectionError, TimeoutError) as e:
+            logger.error(f"FGA network or validation error during object check: {e}")
+            return False

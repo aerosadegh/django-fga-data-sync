@@ -1,19 +1,19 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
 class FGASyncOutbox(models.Model):
     class Status(models.TextChoices):
         # Database Value, Human Readable Label
-        PENDING = "PENDING", "Pending"
-        SYNCED = "SYNCED", "Synced"
-        FAILED = "FAILED", "Failed"
+        PENDING = "PEND", _("Pending")
+        SYNCED = "SYNC", _("Synced")
+        FAILED = "FAIL", _("Failed")
 
     class Action(models.TextChoices):
         # Database Value, Human Readable Label
-        WRITE = "WRITE", "Write"
-        DELETE = "DELETE", "Delete"
+        WRITE = "WRT", _("Write")
+        DELETE = "DEL", _("Delete")
 
-    # max_length=7 covers "DELETE" (6 chars) with 1 char buffer for safety
     action = models.CharField(
         max_length=max(len(c[0]) for c in Action.choices), choices=Action.choices
     )
