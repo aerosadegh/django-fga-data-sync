@@ -9,6 +9,7 @@ from django.db import transaction
 from openfga_sdk.client.models import ClientCheckRequest, ClientListObjectsRequest
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.request import Request
+from rest_framework.viewsets import ViewSetMixin
 
 from fga_data_sync.adapters import FGATupleAdapter
 from fga_data_sync.models import FGASyncOutbox
@@ -21,14 +22,47 @@ __all__ = [
     "FGAViewMixin",
 ]
 
-
 logger = logging.getLogger(__name__)
 
 
 class FGAModelSyncMixin:
-    """
-    Structure-agnostic mixin for synchronizing Django models to OpenFGA via the Outbox pattern.
-    Requires `fga_config` to be defined on the model using `FGAModelConfig`.
+    """Structure-agnostic mixin for synchronizing Django models to OpenFGA via the Outbox pattern.
+
+    This mixin intercepts the standard Django `save()` and `delete()` lifecycles.
+    It utilizes the defined `FGAModelConfig` to calculate the exact OpenFGA tuple
+    differences (diffs) and safely queues them in the local database transaction.
+
+    Attributes:
+        fga_config: The strict configuration class defining how this model maps
+                    to the OpenFGA graph. Must be an instance of `FGAModelConfig`.
+        pk: The primary key of the model instance.
+
+    Example:
+        ```python
+        from django.db import models
+        from fga_data_sync.structs import FGAModelConfig, FGACreatorConfig
+
+        class Document(FGAModelSyncMixin, models.Model):
+            title = models.CharField(max_length=255)
+            creator_id = models.CharField(max_length=255)
+
+            fga_config = FGAModelConfig(
+                object_type="document",
+                creators=[
+                    FGACreatorConfig(
+                        relation="editor",
+                        local_field="creator_id"
+                    )
+                ]
+            )
+        ```
+
+    Notes:
+        Because this mixin relies on intercepting the `save()` method for the
+        Transactional Outbox pattern, standard Django bulk operations
+        (e.g., `Document.objects.bulk_create()`) will bypass this mixin.
+        You must save instances individually or trigger the outbox manually
+        for bulk operations.
     """
 
     fga_config: ClassVar[FGAModelConfig | None] = None
@@ -85,9 +119,43 @@ class FGAModelSyncMixin:
 
 
 class FGAViewMixin:
-    """
-    Structure-agnostic mixin for DRF Views to enforce FGA Authorization.
-    Requires `fga_config` of type `FGAViewConfig`.
+    """Structure-agnostic mixin for DRF Views to enforce OpenFGA Authorization.
+
+    This mixin automatically handles three critical authorization lifecycle hooks
+    in Django REST Framework without requiring manual permission logic:
+
+    1. Queryset Filtering (`get_queryset`): Injects `id__in` filters on list views.
+    2. Parent Verification (`check_permissions`): Checks required parent roles on POST requests.
+    3. Object Verification (`check_object_permissions`): Checks specific object roles on
+       PUT/PATCH/DELETE.
+
+    Attributes:
+        fga_config: The strict configuration class defining the authorization rules
+                    for this view. Must be an instance of `FGAViewConfig`.
+
+    Example:
+        ```python
+        from rest_framework import viewsets
+        from fga_data_sync.structs import FGAViewConfig
+
+        class DocumentViewSet(FGAViewMixin, viewsets.ModelViewSet):
+            queryset = Document.objects.all()
+            serializer_class = DocumentSerializer
+
+            fga_config = FGAViewConfig(
+                object_type="document",
+                read_relation="can_read_document",
+                update_relation="can_update",
+                delete_relation="can_delete"
+            )
+        ```
+
+    Raises:
+        ImproperlyConfigured: If `fga_config` is missing, invalid, or utilizes
+                              ViewSet-only features (like `action_relations`) on
+                              a standard Generic View.
+        AuthenticationFailed: If the Traefik identity header is missing.
+        PermissionDenied: If the OpenFGA network check denies access.
     """
 
     fga_config: ClassVar[FGAViewConfig | None] = None
@@ -125,6 +193,15 @@ class FGAViewMixin:
     def _get_config(self) -> FGAViewConfig:
         if not isinstance(self.fga_config, FGAViewConfig):
             raise ImproperlyConfigured("View must define `fga_config` of type `FGAViewConfig`.")
+
+        # 🛡️ THE GUARDRAIL: Fail fast on Dead Configuration
+        if self.fga_config.action_relations and not isinstance(self, ViewSetMixin):
+            raise ImproperlyConfigured(
+                f"View '{self.__class__.__name__}' defines 'action_relations' in its "
+                f"FGAViewConfig, but it is not a ViewSet. Standard Generic Views "
+                "do not support @action decorators."
+            )
+
         return self.fga_config
 
     def get_queryset(self):
