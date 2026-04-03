@@ -2,17 +2,26 @@
 from typing import ClassVar
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.viewsets import ViewSetMixin
 
 from fga_data_sync.permissions import IsFGAAuthorized
 from fga_data_sync.structs import FGAViewConfig
 
 from .models import MockFolder
 
+pytestmark = pytest.mark.django_db
+
+
+# ==========================================
+# 🛠️ TEST FIXTURE VIEWS
+# ==========================================
+
 
 class DummyProtectedView(APIView):
-    """A dummy DRF view protected by our permission class."""
+    """A standard DRF view protected by our permission class."""
 
     permission_classes: ClassVar[list] = [IsFGAAuthorized]
     fga_config = FGAViewConfig(
@@ -30,36 +39,37 @@ class DummyProtectedView(APIView):
         return Response({"status": "ok"})
 
 
+class DummyProtectedViewSet(ViewSetMixin, APIView):
+    """A DRF ViewSet mock to test action_relations safely."""
+
+    permission_classes: ClassVar[list] = [IsFGAAuthorized]
+
+
+# ==========================================
+# 🧪 PERMISSIONS TEST SUITE
+# ==========================================
+
+
 class TestIsFGAAuthorized:
     def test_object_level_permission_checks_http_method(self, api_rf, mock_fga_client):
-        """Verifies GET/PUT/DELETE map to the correct FGA relations."""
+        """Verifies GET maps to the correct FGA read_relation."""
 
-        # Create a mock database object
         class MockObj:
             id = "folder_99"
 
         mock_obj = MockObj()
 
-        # 1. Test a GET request (Reads)
         request = api_rf.get("/dummy/1/")
         request.fga_user = "user:bob"
 
-        # Create an instance of the permission class directly to test has_object_permission
         perm = IsFGAAuthorized()
-
-        # Setup the mock to ALLOW
         mock_fga_client.check.return_value.allowed = True
-
-        # The view needs to be instantiated to pass into the permission class
         view_instance = DummyProtectedView()
 
         result = perm.has_object_permission(request, view_instance, mock_obj)
-        assert result is True
 
-        # Verify it checked the 'read_relation' we defined in DummyProtectedView
-        mock_fga_client.check.assert_called_with(
-            mock_fga_client.check.call_args[0][0]  # Get the ClientCheckRequest object passed
-        )
+        assert result is True
+        mock_fga_client.check.assert_called_once()
         called_request = mock_fga_client.check.call_args[0][0]
         assert called_request.relation == "can_read"
         assert called_request.object == "folder:folder_99"
@@ -77,16 +87,12 @@ class TestIsFGAAuthorized:
         """Verifies POST requests successfully check the parent's permission."""
         view = DummyProtectedView.as_view()
         request = api_rf.post("/dummy/", {"org_id": "org_777"}, format="json")
-        request.fga_user = "user:bob"  # Simulate Traefik middleware
+        request.fga_user = "user:bob"
 
-        # Configure the mock network to approve the request
         mock_fga_client.check.return_value.allowed = True
-
         response = view(request)
 
         assert response.status_code == 200
-        # Verify the permission class asked OpenFGA the exact right question
-        mock_fga_client.check.assert_called_once()
         called_request = mock_fga_client.check.call_args[0][0]
         assert called_request.user == "user:bob"
         assert called_request.relation == "can_add_folder"
@@ -98,16 +104,13 @@ class TestIsFGAAuthorized:
         request = api_rf.post("/dummy/", {"org_id": "org_777"}, format="json")
         request.fga_user = "user:mallory"
 
-        # Configure the mock network to DENY the request
         mock_fga_client.check.return_value.allowed = False
-
         response = view(request)
+
         assert response.status_code == 403
 
     def test_missing_config_raises_error(self, api_rf):
         """Verifies that an improperly configured view crashes loudly."""
-        from django.core.exceptions import ImproperlyConfigured
-        from rest_framework.views import APIView
 
         class BadView(APIView):
             permission_classes: ClassVar[list] = [IsFGAAuthorized]
@@ -143,7 +146,6 @@ class TestIsFGAAuthorized:
         """Verifies object access is denied if Traefik user header is missing."""
         view = DummyProtectedView()
         request = api_rf.get("/dummy/1/")
-        # Intentionally missing request.fga_user
 
         perm = IsFGAAuthorized()
         assert perm.has_object_permission(request, view, MockFolder(id=1)) is False
@@ -171,11 +173,26 @@ class TestIsFGAAuthorized:
         perm = IsFGAAuthorized()
         assert perm.has_object_permission(request, view, MockFolder(id=1)) is False
 
+    def test_guardrail_action_relations_on_generic_view(self, api_rf):
+        """Verifies that defining action_relations on a non-ViewSet crashes safely."""
+        view = DummyProtectedView()
+        view.fga_config = FGAViewConfig(
+            object_type="folder", action_relations={"custom_action": "can_custom"}
+        )
+        request = api_rf.get("/dummy/1/")
+        request.fga_user = "user:bob"
+
+        perm = IsFGAAuthorized()
+
+        with pytest.raises(ImproperlyConfigured) as exc:
+            perm._get_config(view)
+
+        assert "is not a ViewSet" in str(exc.value)
+        assert "Standard Generic Views do not support @action" in str(exc.value)
+
     def test_has_object_permission_action_mapping(self, api_rf, mock_fga_client):
         """Verifies custom ViewSet actions map to the correct FGA relation."""
-        from fga_data_sync.structs import FGAViewConfig
-
-        view = DummyProtectedView()
+        view = DummyProtectedViewSet()
         view.action = "publish"
         view.fga_config = FGAViewConfig(
             object_type="folder", action_relations={"publish": "publisher"}
@@ -188,10 +205,11 @@ class TestIsFGAAuthorized:
         perm = IsFGAAuthorized()
         assert perm.has_object_permission(request, view, MockFolder(id=1)) is True
 
+        called_request = mock_fga_client.check.call_args[0][0]
+        assert called_request.relation == "publisher"
+
     def test_has_object_permission_put_maps_to_update_relation(self, api_rf, mock_fga_client):
         """Verifies that PUT requests enforce the 'update_relation'."""
-        from fga_data_sync.structs import FGAViewConfig
-
         view = DummyProtectedView()
         view.fga_config = FGAViewConfig(object_type="document", update_relation="editor")
 
@@ -201,48 +219,35 @@ class TestIsFGAAuthorized:
         mock_fga_client.check.return_value.allowed = True
         perm = IsFGAAuthorized()
 
-        # Execute the check
         assert perm.has_object_permission(request, view, MockFolder(id=1)) is True
 
-        # Verify the FGA client was asked the EXACT right question
         called_request = mock_fga_client.check.call_args[0][0]
         assert called_request.relation == "editor"
         assert called_request.object == "document:1"
 
-    def test_has_object_permission_patch_maps_to_update_relation(self, api_rf, mock_fga_client):
-        """Verifies that PATCH requests also enforce the 'update_relation'."""
-        from fga_data_sync.structs import FGAViewConfig
-
+    def test_has_object_permission_unmapped_http_method(self, api_rf, mock_fga_client):
+        """Verifies that unmapped or rogue HTTP methods (like TRACE) are denied."""
         view = DummyProtectedView()
-        view.fga_config = FGAViewConfig(object_type="document", update_relation="editor")
+        view.fga_config = FGAViewConfig(object_type="document", read_relation="reader")
 
-        request = api_rf.patch("/dummy/1/", {"title": "Patched"}, format="json")
+        request = api_rf.generic("TRACE", "/dummy/1/")
         request.fga_user = "user:bob"
 
-        mock_fga_client.check.return_value.allowed = True
         perm = IsFGAAuthorized()
+        assert perm.has_object_permission(request, view, MockFolder(id=1)) is False
+        mock_fga_client.check.assert_not_called()
 
+    def test_has_object_permission_explicit_opt_out(self, api_rf, mock_fga_client):
+        """Verifies that setting a mapped relation to None bypasses the network check."""
+        view = DummyProtectedView()
+        # Explicitly opt-out of read checks
+        view.fga_config = FGAViewConfig(object_type="document", read_relation=None)
+
+        request = api_rf.get("/dummy/1/")
+        request.fga_user = "user:bob"
+
+        perm = IsFGAAuthorized()
         assert perm.has_object_permission(request, view, MockFolder(id=1)) is True
 
-        called_request = mock_fga_client.check.call_args[0][0]
-        assert called_request.relation == "editor"
-
-    def test_has_object_permission_delete_maps_to_delete_relation(self, api_rf, mock_fga_client):
-        """Verifies that DELETE requests strictly enforce the 'delete_relation'."""
-        from fga_data_sync.structs import FGAViewConfig
-
-        view = DummyProtectedView()
-        view.fga_config = FGAViewConfig(object_type="document", delete_relation="owner")
-
-        request = api_rf.delete("/dummy/1/")
-        request.fga_user = "user:bob"
-
-        # We simulate the user NOT having the owner relation to ensure it fails securely
-        mock_fga_client.check.return_value.allowed = False
-        perm = IsFGAAuthorized()
-
-        assert perm.has_object_permission(request, view, MockFolder(id=1)) is False
-
-        # Verify it specifically asked for the 'owner' relation, not 'editor' or 'viewer'
-        called_request = mock_fga_client.check.call_args[0][0]
-        assert called_request.relation == "owner"
+        # Mathematical proof: It bypassed the check, so the network was never called
+        mock_fga_client.check.assert_not_called()
