@@ -283,22 +283,110 @@ class FGAViewConfig:
         **Validation Rules:**
 
         - If any `create_*` parameter is set, all three (`create_parent_type`,
-        `create_parent_field`, `create_relation`) must be provided.
+          `create_parent_field`, `create_relation`) must be provided.
         - Partial creation configs raise a `ValueError` to prevent misconfiguration.
         - Relations set to `None` disable that specific authorization check. Use this carefully
-        and only when certain operations don't require FGA enforcement.
+          and only when certain operations don't require FGA enforcement.
+        - Defining `action_relations` requires the view to inherit from a DRF `ViewSet`. The
+          framework will raise an `ImproperlyConfigured` error if used on standard generic views.
+        - Ensure that keys defined in `action_relations` map to actual `@action` decorated
+          methods physically implemented on your ViewSet.
 
-        **Usage with Views:**
+        **Integration Flexibility:**
+        This configuration is structure-agnostic. You can use it alongside either the
+        `IsFGAAuthorized` permission class OR the `FGAViewMixin`. Both tools work flawlessly
+        across standard Generic Views and complex ViewSets.
+
+        **Minimal Action Example:**
+        The keys in `action_relations` must match the method name decorated with `@action`:
         ```python
-        class DocumentViewSet(FGAViewMixin, viewsets.ModelViewSet):
+        from rest_framework import viewsets
+        from rest_framework.decorators import action
+        from rest_framework.response import Response
+        from fga_data_sync.mixins import FGAViewMixin
+
+        class SampleViewSet(FGAViewMixin, viewsets.ModelViewSet):
+            # 1. In Config:
+            fga_config = FGAViewConfig(
+                object_type="document",
+                action_relations={"archive": "can_archive"}
+            )
+
+            # 2. In ViewSet:
+            @action(detail=True, methods=["post"])
+            def archive(self, request, pk=None):
+                obj = self.get_object()  # Automatically triggers the "can_archive" check!
+                return Response({"status": "archived"})
+        ```
+
+        **Usage with Generic Views:**
+        ```python
+        from rest_framework import generics
+        from fga_data_sync.permissions import IsFGAAuthorized
+        from fga_data_sync.structs import FGAViewConfig
+
+        # 1. Creation View (Handles POST and Parent Cascading)
+        class DocumentCreateAPIView(generics.CreateAPIView):
+            permission_classes = [IsFGAAuthorized]
+
+            fga_config = FGAViewConfig(
+                object_type="document",
+                create_parent_type="folder",
+                create_parent_field="folder_id",
+                create_relation="can_add_items"
+            )
+
+        # 2. Detail View (Handles GET, PUT, PATCH, DELETE)
+        class DocumentDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+            permission_classes = [IsFGAAuthorized]
+
             fga_config = FGAViewConfig(
                 object_type="document",
                 read_relation="can_read_document",
                 update_relation="can_update",
-                delete_relation="can_delete",
+                delete_relation="can_delete"
+            )
+        ```
+
+        **Usage with Generic Views and FGAViewMixin:**
+        ```python
+        from rest_framework import generics
+        from fga_data_sync.mixins import FGAViewMixin
+        from fga_data_sync.structs import FGAViewConfig
+
+        # 1. Collection View (Handles GET List and POST Create)
+        class DocumentListCreateAPIView(FGAViewMixin, generics.ListCreateAPIView):
+            queryset = Document.objects.all()
+            serializer_class = DocumentSerializer
+
+            # The Mixin uses this config to automatically filter the List (GET)
+            # and verify the Parent Role (POST) before creation.
+            fga_config = FGAViewConfig(
+                object_type="document",
+                read_relation="can_read_document",
                 create_parent_type="folder",
                 create_parent_field="folder_id",
                 create_relation="can_add_items"
+            )
+
+            def perform_create(self, serializer):
+                # The mixin already verified we have 'can_add_items' on the parent folder!
+                raw_user_id = self.request.fga_user.replace("user:", "")
+                serializer.save(creator_id=raw_user_id)
+
+
+        # 2. Detail View (Handles GET, PUT, PATCH, DELETE on a specific ID)
+        class DocumentDetailAPIView(FGAViewMixin, generics.RetrieveUpdateDestroyAPIView):
+            queryset = Document.objects.all()
+            serializer_class = DocumentSerializer
+
+            # The Mixin uses this config to automatically verify object-level roles
+            # based on the exact HTTP method being used.
+            fga_config = FGAViewConfig(
+                object_type="document",
+                read_relation="can_read_document",
+                update_relation="can_update",
+                delete_relation="can_delete"
             )
         ```
 

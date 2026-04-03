@@ -38,6 +38,7 @@ class FGAModelSyncMixin:
         pk: The primary key of the model instance.
 
     Example:
+        **Basic Creator Ownership:**
         ```python
         from django.db import models
         from fga_data_sync.structs import FGAModelConfig, FGACreatorConfig
@@ -57,7 +58,63 @@ class FGAModelSyncMixin:
             )
         ```
 
+        **Parent Hierarchies (Cascading):**
+        ```python
+        from fga_data_sync.structs import FGAParentConfig
+
+        class Folder(FGAModelSyncMixin, models.Model):
+            name = models.CharField(max_length=255)
+            org_id = models.CharField(max_length=255)
+            creator_id = models.CharField(max_length=255)
+
+            fga_config = FGAModelConfig(
+                object_type="folder",
+                parents=[
+                    FGAParentConfig(
+                        relation="organization",
+                        parent_type="organization",
+                        local_field="org_id"
+                    )
+                ],
+                creators=[
+                    FGACreatorConfig(
+                        relation="owner",
+                        local_field="creator_id"
+                    )
+                ]
+            )
+        ```
+
+        **Custom Role Assignment (Escape Hatch):**
+        If you need to assign FGA roles based on dynamic data state (like a boolean field),
+        you can intercept `save()` and manually queue tuples into the Outbox:
+        ```python
+        from fga_data_sync.models import FGASyncOutbox
+
+        class Article(FGAModelSyncMixin, models.Model):
+            title = models.CharField(max_length=255)
+            is_public = models.BooleanField(default=False)
+
+            fga_config = FGAModelConfig(object_type="article")
+
+            def save(self, *args, **kwargs):
+                # 1. Let the mixin handle the standard config-based tuples first
+                super().save(*args, **kwargs)
+
+                # 2. Inject your custom, dynamic logic
+                if self.is_public:
+                    self._queue_outbox(
+                        action=FGASyncOutbox.Action.WRITE.value,
+                        t={
+                            "user": "user:*",  # OpenFGA wildcard for 'everyone'
+                            "relation": "viewer",
+                            "object": f"article:{self.pk}"
+                        }
+                    )
+        ```
+
     Notes:
+        **Limitations:**
         Because this mixin relies on intercepting the `save()` method for the
         Transactional Outbox pattern, standard Django bulk operations
         (e.g., `Document.objects.bulk_create()`) will bypass this mixin.
