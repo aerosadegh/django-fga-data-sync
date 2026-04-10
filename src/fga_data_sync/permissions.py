@@ -1,5 +1,5 @@
 import logging
-from typing import Protocol
+from typing import Any, Protocol
 
 from django.core.exceptions import ImproperlyConfigured
 from openfga_sdk.client.models import ClientCheckRequest
@@ -8,6 +8,7 @@ from rest_framework.request import Request
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSetMixin
 
+from .conf import get_setting
 from .structs import FGAViewConfig
 from .utils import get_fga_client
 
@@ -19,6 +20,7 @@ class FGAConfiguredView(Protocol):
 
     fga_config: FGAViewConfig
     action: str | None = None
+    kwargs: dict[str, Any]
 
 
 UPDATE_METHODS: set[str] = {"PUT", "PATCH"}
@@ -66,9 +68,11 @@ class IsFGAAuthorized(permissions.BasePermission):
         Returns:
             bool: True if the request is allowed to proceed, False otherwise.
         """
-        fga_user: str | None = getattr(request, "fga_user", None)
+        user_attr = get_setting("FGA_USER_ATTR")
+        fga_user: str | None = getattr(request, user_attr, None)
+
         if not fga_user:
-            logger.warning("FGA Authorization denied: No 'fga_user' found on request.")
+            logger.warning(f"FGA Authorization denied: No '{user_attr}' found on request.")
             return False
 
         config = self._get_config(view)
@@ -151,16 +155,24 @@ class IsFGAAuthorized(permissions.BasePermission):
             return True
 
         # 4. Perform FGA Network Check
-        fga_user: str | None = getattr(request, "fga_user", None)
+        user_attr = get_setting("FGA_USER_ATTR")
+        fga_user: str | None = getattr(request, user_attr, None)
         if not fga_user:
             logger.warning("FGA Authorization denied: No 'fga_user' found on request.")
             return False
 
         try:
             # Defensive lookup for object identifier
-            object_id = getattr(obj, "id", getattr(obj, "pk", None))
+            # 🤠 NEW: Resolve Object ID Statelessly OR Statefuly
+            if config.lookup_header:
+                object_id = request.META.get(config.lookup_header)
+            elif config.lookup_url_kwarg:
+                object_id = view.kwargs.get(config.lookup_url_kwarg)
+            else:
+                object_id = getattr(obj, "id", getattr(obj, "pk", None))
+
             if not object_id:
-                logger.error(f"Authorization target {obj} lacks an 'id' or 'pk' attribute.")
+                logger.error("Authorization target lacks an identifier.")
                 return False
 
             client = get_fga_client()

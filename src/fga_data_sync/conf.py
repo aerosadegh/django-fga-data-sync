@@ -8,6 +8,16 @@ DEFAULTS = {
     "OPENFGA_STORE_ID": None,
     "BATCH_SIZE": 50,
     "MAX_RETRIES": 5,
+    "REQUEST_HEADER_MAPPINGS": {
+        "X-User-Id": "fga_user",
+        # "X-Context-Org-Id": "fga_tenant",
+        # "X-Department-Id": "fga_department",
+        # "X-Clearance-Level": "fga_clearance",
+    },
+    # Tells the Mixins/Permissions which attribute to use for FGA checks
+    "FGA_USER_ATTR": "fga_user",
+    # Prefix added automatically to the user ID
+    "FGA_USER_PREFIX": "user:",
 }
 
 

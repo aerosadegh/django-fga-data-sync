@@ -55,7 +55,7 @@ class FGATupleAdapter:
             if user_id:
                 tuples.append(
                     {
-                        "user": f"user:{user_id}",
+                        "user": f"{creator.user_type}:{user_id}",
                         "relation": creator.relation,
                         "object": object_string,
                     }

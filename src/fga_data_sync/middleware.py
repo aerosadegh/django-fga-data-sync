@@ -1,4 +1,5 @@
 # fga_data_sync/middleware.py
+from .conf import get_setting
 
 
 class TraefikIdentityMiddleware:
@@ -17,6 +18,14 @@ class TraefikIdentityMiddleware:
         ...     "fga_data_sync.middleware.TraefikIdentityMiddleware",
         ...     ...
         ... ]
+        >>> # In settings.py
+        >>> FGA_DATA_SYNC = {
+        ...     "REQUEST_HEADER_MAPPINGS": {
+        ...         "X-User-Id": "auth_user",
+        ...         "X-Context-Org-Id": "active_tenant" # for example
+        ...     },
+        ...     "FGA_USER_ATTR": "auth_user"
+        ... }
         >>>
         >>> # In a view
         >>> def my_view(request):
@@ -27,11 +36,20 @@ class TraefikIdentityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        dij_user_id = request.headers.get("X-User-Id")
+        # 1. Fetch the dynamic dictionary and FGA settings
+        header_mappings = get_setting("REQUEST_HEADER_MAPPINGS")
+        fga_user_attr = get_setting("FGA_USER_ATTR")
+        fga_prefix = get_setting("FGA_USER_PREFIX")
 
-        if dij_user_id:
-            request.fga_user = f"user:{dij_user_id}"
-        else:
-            request.fga_user = None
+        # 2. Iterate through every mapped header (No hard limits!)
+        for header_name, target_attr in header_mappings.items():
+            header_value = request.headers.get(header_name)
+
+            # 3. Apply the OpenFGA prefix strictly to the user attribute
+            if header_value and target_attr == fga_user_attr:
+                header_value = f"{fga_prefix}{header_value}"
+
+            # 4. Dynamically attach the attribute to the Django Request
+            setattr(request, target_attr, header_value)
 
         return self.get_response(request)

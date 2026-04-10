@@ -69,6 +69,9 @@ class FGACreatorConfig:
                      Typically this is a ForeignKey to the User model or a UUID field
                      named "creator_id", "owner_id", etc.
 
+        user_type: The OpenFGA type for the creator (defaults to "user").
+                   Override this if the creator is a machine role, API key, or team (e.g., "team").
+
     Example:
         ```python
         FGACreatorConfig(
@@ -96,6 +99,7 @@ class FGACreatorConfig:
 
     relation: str
     local_field: str
+    user_type: str = "user"
 
 
 @dataclass(frozen=True)
@@ -213,6 +217,10 @@ class FGAViewConfig:
         delete_relation: The OpenFGA relation required to remove objects (e.g., "can_delete").
                          Checked on DELETE requests. Set to None to skip
                          delete authorization checks.
+        lookup_header: An optional HTTP header name (e.g., "HTTP_X_CONTEXT_ORG_ID")
+                       used to extract the target object ID statelessly, bypassing database lookups.
+        lookup_url_kwarg: An optional URL kwarg name (e.g., "org_id")
+                          used to extract the target object ID from the router statelessly.
         create_parent_type: For POST/creation requests, the OpenFGA type of the parent
                             object that must exist (e.g., "folder", "organization"). Used
                             to verify users have permission to create objects within a
@@ -399,6 +407,10 @@ class FGAViewConfig:
     read_relation: str | None = None
     update_relation: str | None = None
     delete_relation: str | None = None
+
+    # 🤠 NEW: Stateless Resolution
+    lookup_header: str | None = None  # e.g., "HTTP_X_CONTEXT_ORG_ID"
+    lookup_url_kwarg: str | None = None  # e.g., "org_id"
 
     # Parent verification for POST/Creation
     create_parent_type: str | None = None

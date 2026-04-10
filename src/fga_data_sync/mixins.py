@@ -11,11 +11,12 @@ from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.request import Request
 from rest_framework.viewsets import ViewSetMixin
 
-from fga_data_sync.adapters import FGATupleAdapter
-from fga_data_sync.models import FGASyncOutbox
-from fga_data_sync.structs import FGAModelConfig, FGAViewConfig
-from fga_data_sync.tasks import process_fga_outbox_batch
-from fga_data_sync.utils import get_fga_client
+from .adapters import FGATupleAdapter
+from .conf import get_setting
+from .models import FGASyncOutbox
+from .structs import FGAModelConfig, FGAViewConfig
+from .tasks import process_fga_outbox_batch
+from .utils import get_fga_client
 
 __all__ = [
     "FGAModelSyncMixin",
@@ -142,24 +143,24 @@ class FGAModelSyncMixin:
 
             if is_new:
                 for t in current_tuples:
-                    self._queue_outbox(FGASyncOutbox.Action.WRITE, t)
+                    self._queue_outbox(FGASyncOutbox.Action.WRITE, t)  # type: ignore[arg-type]
             else:
                 to_delete, to_write = FGATupleAdapter.compute_diffs(
                     self._original_tuples, current_tuples
                 )
 
                 for t in to_delete:
-                    self._queue_outbox(FGASyncOutbox.Action.DELETE, t)
+                    self._queue_outbox(FGASyncOutbox.Action.DELETE, t)  # type: ignore[arg-type]
 
                 for t in to_write:
-                    self._queue_outbox(FGASyncOutbox.Action.WRITE, t)
+                    self._queue_outbox(FGASyncOutbox.Action.WRITE, t)  # type: ignore[arg-type]
 
             self._original_tuples = current_tuples
 
     def delete(self, *args: Any, **kwargs: Any) -> None:
         with transaction.atomic():
             for t in FGATupleAdapter.generate_tuples(self, self.fga_config):
-                self._queue_outbox(FGASyncOutbox.Action.DELETE, t)
+                self._queue_outbox(FGASyncOutbox.Action.DELETE, t)  # type: ignore[arg-type]
             super().delete(*args, **kwargs)  # type: ignore[misc]
 
     def _queue_outbox(self, action: str, t: dict[str, str]) -> None:
@@ -241,10 +242,10 @@ class FGAViewMixin:
             warnings.warn(msg, UserWarning, stacklevel=2)
 
     def _get_fga_user(self) -> str:
-        fga_user = getattr(self.request, "fga_user", None)
+        user_attr = get_setting("FGA_USER_ATTR")
+        fga_user = getattr(self.request, user_attr, None)
         if not fga_user:
-            # Defensive fix: Missing identity is a 401 Authentication Failed, not 403.
-            raise AuthenticationFailed("Missing identity context.")
+            raise AuthenticationFailed(f"Missing identity context on '{user_attr}'.")
         return fga_user
 
     def _get_config(self) -> FGAViewConfig:

@@ -11,6 +11,7 @@ from fga_data_sync.permissions import IsFGAAuthorized
 from fga_data_sync.structs import FGAViewConfig
 
 from .models import MockFolder
+from .views import FinanceDashboardView
 
 pytestmark = pytest.mark.django_db
 
@@ -251,3 +252,138 @@ class TestIsFGAAuthorized:
 
         # Mathematical proof: It bypassed the check, so the network was never called
         mock_fga_client.check.assert_not_called()
+
+    def test_stateless_resolution_via_url_kwarg(self, api_rf, mock_fga_client):
+        """
+        Verifies that `Workspace_kwarg` extracts the object ID directly from
+        the DRF router kwargs, completely bypassing the database object's ID.
+        """
+        view = DummyProtectedView()
+
+        # 🤠 Override config for stateless URL resolution
+        view.fga_config = FGAViewConfig(
+            object_type="organization",
+            read_relation="can_view",
+            lookup_url_kwarg="org_id",
+        )
+
+        # Simulating DRF injecting kwargs from the URL (e.g., /api/orgs/<org_id>/)
+        view.kwargs = {"org_id": "acme_123"}
+
+        request = api_rf.get("/dummy/")
+
+        # The dynamic user attribute logic
+        from fga_data_sync.conf import get_setting
+
+        setattr(request, get_setting("FGA_USER_ATTR"), "user:bob")
+
+        # Prove that the database object is ignored by passing an empty class
+        class EmptyObject:
+            pass
+
+        perm = IsFGAAuthorized()
+        mock_fga_client.check.return_value.allowed = True
+
+        # Execute check
+        assert perm.has_object_permission(request, view, EmptyObject()) is True
+
+        # Verify OpenFGA was queried with the URL Kwarg, NOT an object PK
+        called_request = mock_fga_client.check.call_args[0][0]
+        assert called_request.object == "organization:acme_123"
+
+    def test_stateless_resolution_via_http_header(self, api_rf, mock_fga_client):
+        """
+        Verifies that `lookup_header` extracts the object ID directly from
+        the incoming HTTP headers, completely bypassing the database object's ID.
+        """
+        view = DummyProtectedView()
+
+        # 🤠 Override config for stateless Header resolution
+        view.fga_config = FGAViewConfig(
+            object_type="organization",
+            read_relation="can_view",
+            lookup_header="HTTP_X_CONTEXT_ORG_ID",
+        )
+        view.kwargs = {}
+
+        # Simulating Traefik/API Gateway injecting a header into the request
+        request = api_rf.get("/dummy/", HTTP_X_CONTEXT_ORG_ID="stark_industries")
+
+        # The dynamic user attribute logic
+        from fga_data_sync.conf import get_setting
+
+        setattr(request, get_setting("FGA_USER_ATTR"), "user:bob")
+
+        class EmptyObject:
+            pass
+
+        perm = IsFGAAuthorized()
+        mock_fga_client.check.return_value.allowed = True
+
+        # Execute check
+        assert perm.has_object_permission(request, view, EmptyObject()) is True
+
+        # Verify OpenFGA was queried with the Header value, NOT an object PK
+        called_request = mock_fga_client.check.call_args[0][0]
+        assert called_request.object == "organization:stark_industries"
+
+
+# Finance App Test
+
+
+class TestStatelessDashboard:
+    def test_dashboard_access_allowed(self, api_rf, mock_fga_client):
+        """
+        Verifies that an authorized user can access the aggregated dashboard.
+        Notice we DO NOT create any Organization objects in the test database!
+        """
+        view = FinanceDashboardView.as_view()
+
+        # 1. Simulate Traefik routing the request to the dashboard
+        # We inject the Organization ID directly into the headers
+        request = api_rf.get("/api/dashboard/", HTTP_X_CONTEXT_ORG_ID="acme_corp")
+
+        # Simulate the middleware attaching the user
+        from fga_data_sync.conf import get_setting
+
+        setattr(request, get_setting("FGA_USER_ATTR"), "user:alice")
+
+        # 2. Tell the mock OpenFGA server to ALLOW the request
+        mock_fga_client.check.return_value.allowed = True
+
+        # 3. Execute the view
+        response = view(request)
+
+        # 4. Verify Success
+        assert response.status_code == 200
+        assert response.data["dashboard_target"] == "acme_corp"
+
+        # 5. Mathematical Proof of Statelessness
+        # We verify OpenFGA was queried using the Header value, not a database ID!
+        mock_fga_client.check.assert_called_once()
+        called_request = mock_fga_client.check.call_args[0][0]
+
+        assert called_request.user == "user:alice"
+        assert called_request.relation == "can_view_finance_dashboard"
+        assert called_request.object == "organization:acme_corp"
+
+    def test_dashboard_access_denied_for_intruder(self, api_rf, mock_fga_client):
+        """
+        Verifies that an unauthorized user is blocked from seeing the dashboard metrics.
+        """
+        view = FinanceDashboardView.as_view()
+
+        # Intruder tries to look at Stark Industries' dashboard
+        request = api_rf.get("/api/dashboard/", HTTP_X_CONTEXT_ORG_ID="stark_industries")
+
+        from fga_data_sync.conf import get_setting
+
+        setattr(request, get_setting("FGA_USER_ATTR"), "user:hacker_bob")
+
+        # 2. Tell the mock OpenFGA server to DENY the request
+        mock_fga_client.check.return_value.allowed = False
+
+        # 3. Execute the view and expect a 403 Forbidden
+        response = view(request)
+
+        assert response.status_code == 403
