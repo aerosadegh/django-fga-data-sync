@@ -10,7 +10,8 @@ We solve this using **Stateless Resolution**.
 
 ---
 
-## The Stateless Pattern (`lookup_header`)
+## The Stateless Pattern
+> Using `lookup_header` in FGAViewConfig
 
 By utilizing the `lookup_header` (or `Workspace_kwarg`) in your `FGAViewConfig`, the `IsFGAAuthorized` permission class will bypass the local database entirely. It extracts the target Object ID directly from the incoming HTTP request and queries OpenFGA.
 

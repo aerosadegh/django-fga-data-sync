@@ -146,10 +146,11 @@ class FGAModelConfig:
         ```
 
     Validation:
-        - object_type must be non-empty (raises ValueError if empty).
-        - Cannot define both parents and creators with overlapping relations (raises ValueError).
-        - All parent and creator configurations are validated via their own __post_init__.
-        - frozen=True prevents accidental mutation after instantiation.
+        - `object_type` must be non-empty (raises `ValueError` if empty).
+        - Cannot define both parents and creators with overlapping relations (raises `ValueError`).
+        - All parent and creator configurations are validated via their own `__post_init__`.
+        - `frozen=True` in the `FGAModelConfig` dataclass prevents accidental mutation after
+          instantiation.
 
     Common Patterns:
         - Single parent hierarchy: document -> folder -> organization
@@ -162,7 +163,7 @@ class FGAModelConfig:
         on Django models that inherit from `FGAModelSyncMixin`.
 
     Raises:
-        ValueError: If object_type is empty, or if duplicate relations are defined
+        ValueError: If `object_type` is empty, or if duplicate relations are defined
                     across parents and creators (which would cause tuple conflicts).
     """
 
