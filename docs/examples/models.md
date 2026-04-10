@@ -1,8 +1,37 @@
 # Syncing Models to OpenFGA
 
 To synchronize a Django model with OpenFGA, simply inherit from `FGAModelSyncMixin` and define your `fga_config` using the `FGAModelConfig` dataclass. The package handles everything else automatically.
+## The "Ownership" Rule: When to use the Mixin
+
+Before adding the `FGAModelSyncMixin` to your models, you must ask one architectural question: **Does this specific mini-app "own" this data?**
+
+In a distributed microservice environment, you will interact with two types of data: data you *own* (Source of Truth) and data you *borrow* (External Context).
+
+### When to USE the Mixin
+> Source of Truth
+
+You **MUST** use the `FGAModelSyncMixin` when your mini-app is the authoritative creator of a resource.
+When a user creates this object in your app, OpenFGA needs to know about it instantly so it can assign the creator their roles.
+
+* **Example:** The Finance App owns `Invoice` and `Expense` records.
+* **Action:** You attach the mixin to the `Invoice` model. When `invoice.save()` is called, the mixin writes `user:alice -> owner -> invoice:123` to the OpenFGA graph.
+
+### When NOT to use the Mixin
+> Borrowed Context
+
+You **MUST NOT** use the `FGAModelSyncMixin` for resources that your mini-app merely references but does not natively create or manage.
+
+* **Example:** The Finance App groups invoices by `Organization`. The central "Core Identity" service owns the `Organization` data, not the Finance App.
+* **Action:** If you create a read-only `Organization` table in your Finance database (or just store `organization_id` strings), **do not attach the mixin to it**. If you did, saving an organization in the Finance app might accidentally overwrite or conflict with the Core service's FGA tuples!
+* **How to authorize it:** To check permissions against borrowed context, completely bypass your local models and use [Stateless Views](stateless-views.md) (e.g., `lookup_header="HTTP_X_CONTEXT_ORG_ID"`).
+
+!!! tip "The Architect's Summary"
+    * **Writing to the Graph:** Use `FGAModelSyncMixin` on models your app explicitly creates.
+    * **Reading from the Graph:** Use `FGAViewConfig(lookup_header=...)` on endpoints that check permissions against external parents.
 
 ### Example: Defining Cascading Inheritance & Roles
+
+*Assume the following code lives in the Central Core service (which **owns** Organizations) and the Document service (which **owns** Folders and Documents).*
 
 ```python
 # models.py
@@ -242,44 +271,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
         # and Celery sweeps up BOTH the mixin's tuples and your custom tuples at the same time!
 ```
 
-### Method 3: Direct Outbox Manipulation
-> The "Escape Hatch"
+### Method 3: Direct Outbox Manipulation (The "Escape Hatch")
 
-Sometimes, you need to assign a role completely outside the standard Model creation lifecycle. For example, you are building an "Invite User" view where an existing `Organization` admin invites a new user as a `manager`.
+Sometimes, you need to assign a role completely outside the standard Model creation lifecycle (for example, inviting an existing user to an Organization). Because you aren't calling `.save()` on a configured model, you can write relationships directly to the FGA Graph by utilizing the `FGASyncOutbox`.
 
-Because you aren't calling `Organization.objects.create()`, the `FGAModelSyncMixin.save()` method won't help you. In this case, you can interact directly with the `FGASyncOutbox` model to queue your own custom tuples.
-
-The Celery worker sweeps the Outbox entirely independently of how the records got there!
-
-```python
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from fga_data_sync.models import FGASyncOutbox
-
-class InviteManagerAPIView(APIView):
-    def post(self, request, org_id):
-        new_manager_id = request.data.get("user_id")
-
-        # 1. Validate the current user has permission to invite (using get_fga_client)
-        # ... validation logic ...
-
-        # 2. Manually queue the new Role Assignment directly into the Outbox!
-        FGASyncOutbox.objects.create(
-            action=FGASyncOutbox.Action.WRITE.value,
-            user_id=f"user:{new_manager_id}",
-            relation="manager",
-            object_id=f"organization:{org_id}"
-        )
-
-        # The transaction.on_commit hook is generally tied to the mixin,
-        # so for raw creation outside of a model save, you can manually trigger the Celery worker to wake up immediately:
-        from fga_data_sync.tasks import process_fga_outbox_batch
-        process_fga_outbox_batch.delay()
-
-        return Response({"status": "User invited and FGA graph updated!"})
-```
-
-!!! tip "Which method should you use?"
-    * Use **Method 1 (Model Override)** if the authorization rule depends on the fields *inside* the database row (like an `is_public` or `status` field).
-    * Use **Method 2 (View `perform_create`)** if the authorization rule depends on external data passed by the user in the API request that isn't saved directly to the model.
-    * Use **Method 3 (Escape Hatch)** when assigning roles without creating or mutating a model instance (e.g., inviting a user to a resource).
+👉 **See the [Role Assignments Guide](../schema/role-assignments.md) for full code examples on how to dynamically assign roles via Views, Scripts, or M2M tables.**

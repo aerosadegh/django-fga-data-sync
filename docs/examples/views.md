@@ -2,7 +2,8 @@
 
 The developer protects the API using the `IsFGAAuthorized` permission class or the `FGAViewMixin`.
 
-You do not have to write custom logic to parse identity headers. The `TraefikIdentityMiddleware` automatically extracts `X-User-Id`.
+You do not have to write custom logic to parse identity headers.
+The `TraefikIdentityMiddleware` dynamically extracts your configured gateway headers (e.g., `X-User-Id`) and attaches them to the request automatically.
 
 Below is the complete implementation for a full CRUD lifecycle across our `Organization` -> `Folder` -> `Document` hierarchy.
 

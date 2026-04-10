@@ -22,7 +22,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     # ...
-    'fga_data_sync.middleware.TraefikIdentityMiddleware', # Automatically extracts X-User-Id
+    # Dynamically maps gateway headers to request attributes
+    'fga_data_sync.middleware.TraefikIdentityMiddleware',
 ]
 ```
 
@@ -40,10 +41,20 @@ Configure the package by adding the `FGA_DATA_SYNC` dictionary to your `settings
 FGA_DATA_SYNC = {
     # REQUIRED: The Store ID provisioned by the Central Auth Service
     "OPENFGA_STORE_ID": "01H...XYZ",
+
     # OPTIONAL: Defaults shown below
     "OPENFGA_API_URL": "http://localhost:8080",
     "BATCH_SIZE": 50,
     "MAX_RETRIES": 5,
+
+    # DYNAMIC MAPPINGS: Map any gateway header to any request attribute!
+    "REQUEST_HEADER_MAPPINGS": {
+        # Required
+        "X-User-Id": "fga_user",
+        # Optionals
+        "X-Context-Org-Id": "fga_tenant",
+    },
+    "FGA_USER_ATTR": "fga_user",
 }
 ```
 

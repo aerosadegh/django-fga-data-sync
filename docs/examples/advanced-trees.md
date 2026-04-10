@@ -19,6 +19,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Prefetch
 from openfga_sdk.client.models import ClientListObjectsRequest
+from fga_data_sync.conf import get_setting
 from fga_data_sync.utils import get_fga_client
 
 from .models import Organization, Folder, Document
@@ -45,7 +46,8 @@ class SecureHierarchyTreeAPIView(APIView):
         return [obj.replace(prefix, "") for obj in response.objects]
 
     def get(self, request):
-        fga_user = getattr(request, "fga_user", None)
+        user_attr = get_setting("FGA_USER_ATTR")
+        fga_user = getattr(request, user_attr, None)
         if not fga_user:
             return Response({"error": "Missing identity context."}, status=401)
 
@@ -81,6 +83,7 @@ from rest_framework import generics
 from rest_framework.exceptions import AuthenticationFailed
 from django.db.models import Prefetch
 from openfga_sdk.client.models import ClientListObjectsRequest
+from fga_data_sync.conf import get_setting
 from fga_data_sync.utils import get_fga_client
 
 from .models import Organization, Folder, Document
@@ -112,7 +115,8 @@ class SecureHierarchyTreeListAPIView(generics.ListAPIView):
         Intercepts the queryset building process to inject FGA security
         and high-performance database Prefetching.
         """
-        fga_user = getattr(self.request, "fga_user", None)
+        user_attr = get_setting("FGA_USER_ATTR")
+        fga_user = getattr(request, user_attr, None)
         if not fga_user:
             raise AuthenticationFailed("Missing identity context.")
 

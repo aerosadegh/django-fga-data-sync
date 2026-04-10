@@ -126,10 +126,12 @@ nav:
   - OpenFGA Schema Design:
     - Roles vs. Permissions: schema/design-guide.md
     - Roles Assignments: schema/role-assignments.md
+    - Architecture: schema/architecture.md
 
   - Examples:
     - Syncing Models: examples/models.md
     - Securing API Views: examples/views.md
+    - Stateless Dashboards: examples/stateless-views.md
     - Nested Hierarchies: examples/advanced-trees.md
 
   - API Reference:

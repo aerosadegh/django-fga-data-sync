@@ -1,5 +1,5 @@
 
-# Mixins
+# Mixins API Reference
 
 ::: fga_data_sync.mixins
     options:
@@ -62,6 +62,11 @@ class Document(FGAModelSyncMixin, models.Model):
     )
 ```
 
+!!! tip "Handling Null Values"
+    If a `Document` is saved without a `project_id` (evaluating to `None`), the framework safely ignores it and only generates tuples for fields that actually contain data.
+
+
+
 ### 🧠 How the Mixin Handles This (Under the Hood)
 
 Because your `FGATupleAdapter` simply iterates over these lists, if a developer saves a new `Document` with ID `100`, the mixin will flawlessly generate and queue **four distinct tuples** into the Outbox in a single transaction:
@@ -117,6 +122,9 @@ class DocumentViewSet(FGAViewMixin, viewsets.ModelViewSet):
         )
 ```
 
+!!! note "Note on Custom User Attributes"
+    The example above assumes you are using the default configuration (`FGA_USER_ATTR = "fga_user"`). If you overrode this in your settings, you must access the user string using your custom attribute name (e.g., `self.request.custom_auth_user`).
+
 ##### Summary of the Flow
 1. **Alice** (acting under an inherited role like `contributor` on the Folder) requests to create a document.
 2. The **FGAViewMixin** verifies her permission and allows it.
@@ -140,6 +148,38 @@ Here are the two architectural ways to handle adding Eve later, depending on you
 
 ##### Method A: The API-Driven Approach (Recommended)
 If your Django application doesn't strictly need to know *who* all the reviewers are (e.g., you rely on FGA for that data), you don't need to change your `Document` model at all.
+
+```python
+from django.db import models
+from fga_data_sync.mixins import FGAModelSyncMixin
+from fga_data_sync.structs import FGAModelConfig, FGACreatorConfig, FGAParentConfig
+
+class Document(FGAModelSyncMixin, models.Model):
+    title = models.CharField(max_length=255)
+
+    # Structural Links
+    folder_id = models.UUIDField()
+
+    # ONLY the original creator(s) recorded at birth
+    author_id = models.UUIDField()
+
+    fga_config = FGAModelConfig(
+        object_type="document",
+        parents=[
+            FGAParentConfig(
+              relation="folder",
+              parent_type="folder",
+              local_field="folder_id"
+            )
+        ],
+        creators=[
+            FGACreatorConfig(
+              relation="author",
+              local_field="author_id"
+            )
+        ]
+    )
+```
 
 Instead, you create a custom action on your ViewSet that allows a user (like Alice) to "invite" or "add" Eve. This beautifully leverages the `action_relations` security we just built!
 
