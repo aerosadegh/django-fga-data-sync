@@ -310,6 +310,10 @@ class FGAViewMixin:
                     f"You must be '{config.create_relation}' on '{config.create_parent_type}'"
                     " to create this object."
                 )
+            return  # Early return for POST creation
+
+        if config.lookup_header or config.lookup_url_kwarg:
+            self.check_object_permissions(request, obj=None)
 
     def check_object_permissions(self, request: Request, obj: Any) -> None:
         super().check_object_permissions(request, obj)  # type: ignore[misc]

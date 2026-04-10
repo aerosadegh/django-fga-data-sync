@@ -103,6 +103,9 @@ class IsFGAAuthorized(permissions.BasePermission):
                 logger.error(f"FGA network or validation error during parent check: {e}")
                 return False
 
+        if config.lookup_header or config.lookup_url_kwarg:
+            return self.has_object_permission(request, view, obj=None)
+
         return True
 
     def has_object_permission(
