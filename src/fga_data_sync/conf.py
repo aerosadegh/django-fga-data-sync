@@ -32,3 +32,33 @@ def get_setting(name: str):
         raise ImproperlyConfigured(f"'{name}' is not a valid FGA_DATA_SYNC setting.")
 
     return user_settings.get(name, DEFAULTS[name])
+
+
+def validate_settings():
+    """
+    Ensures the FGA configuration is logically consistent.
+    Should be called in AppConfig.ready().
+    """
+    user_attr = get_setting("FGA_USER_ATTR")
+    mappings = get_setting("REQUEST_HEADER_MAPPINGS")
+
+    # 🤠 THE HANDSHAKE CHECK
+    # Ensure the attribute we use for checks is actually being populated by the middleware
+    if user_attr not in mappings.values():
+        raise ImproperlyConfigured(
+            f"FGA_DATA_SYNC['FGA_USER_ATTR'] is set to '{user_attr}', "
+            f"but this attribute is not defined as a target in 'REQUEST_HEADER_MAPPINGS'. "
+            f"The TraefikIdentityMiddleware will never be able to set the user context."
+        )
+
+    # Ensure the prefix is provided for Zanzibar compatibility
+    prefix = get_setting("FGA_USER_PREFIX")
+    if not prefix or not prefix.endswith(":"):
+        import warnings
+
+        warnings.warn(
+            f"FGA_USER_PREFIX ('{prefix}') does not end with a colon. "
+            f"Standard OpenFGA object strings usually follow 'type:id' format.",
+            UserWarning,
+            stacklevel=2,
+        )
