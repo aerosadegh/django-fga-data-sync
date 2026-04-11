@@ -154,7 +154,8 @@ extra:
 
 
 extra_javascript:
-  - https://unpkg.com/mermaid@11.13.0/dist/mermaid.min.js
+  # - https://unpkg.com/mermaid@11.13.0/dist/mermaid.min.js
+  - assets/js/mermaid.min.js
 
 extra_css:
   - assets/css/extra.css
