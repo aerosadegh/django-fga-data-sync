@@ -47,7 +47,7 @@ Ready to get started? Follow our step-by-step guides to wire up enterprise-grade
 
     Master the "Roles vs. Permissions" pattern to decouple your security rules.
 
--   :fontawesome-solid-book-open: **[Developer Guides Example](examples/models.md)**
+-   :fontawesome-solid-book-open: **[Developer Guides](examples/models.md)**
 
     ---
 

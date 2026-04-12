@@ -141,7 +141,7 @@ class SecureHierarchyTreeListAPIView(generics.ListAPIView):
 
 #### Serializer for the Standard Views
 
-This is the standard `DocumentSerializer` referenced in the `DocumentCreateAPIView` and `DocumentViewSet` examples in `guides/views.md`. Notice how `creator_id` is set to `read_only=True` because our view logic handles injecting the current user's ID during creation.
+This is the standard `DocumentSerializer` referenced in the `DocumentCreateAPIView` and `DocumentViewSet` examples in [Securing API Views](views.md). Notice how `creator_id` is set to `read_only=True` because our view logic handles injecting the current user's ID during creation.
 
 ```python
 # serializers.py

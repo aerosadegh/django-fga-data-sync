@@ -104,6 +104,68 @@ Whenever you call `Document.objects.create()`, `document.save()`, or `document.d
 
 ---
 
+
+
+### 🏗️ The Multi-Parent & Multi-Creator Architecture
+
+Imagine a scenario where a `Document` belongs to both a `Folder` and a `Project` (Multiple Parents). Furthermore, when it is created, it assigns both an `author` and an initial `reviewer` (Multiple Creators).
+
+Here is the perfect example to add to your documentation or docstrings:
+
+```python
+from django.db import models
+from fga_data_sync.mixins import FGAModelSyncMixin
+from fga_data_sync.structs import FGAModelConfig, FGAParentConfig, FGACreatorConfig
+
+class Document(FGAModelSyncMixin, models.Model):
+    title = models.CharField(max_length=255)
+
+    # Structural Links (Multiple Parents)
+    folder_id = models.UUIDField()
+    project_id = models.UUIDField(null=True, blank=True)
+
+    # Role Assignments (Multiple Creators)
+    author_id = models.UUIDField()
+    reviewer_id = models.UUIDField()
+
+    fga_config = FGAModelConfig(
+        object_type="document",
+
+        # 🌳 MULTIPLE PARENTS
+        # The document inherits permissions from BOTH the folder and the project.
+        parents=[
+            FGAParentConfig(
+                relation="folder",
+                parent_type="folder",
+                local_field="folder_id"
+            ),
+            FGAParentConfig(
+                relation="project",
+                parent_type="project",
+                local_field="project_id"
+            )
+        ],
+
+        # 👥 MULTIPLE CREATORS
+        # Both the author and the reviewer are explicitly assigned roles upon creation.
+        creators=[
+            FGACreatorConfig(
+                relation="author",
+                local_field="author_id"
+            ),
+            FGACreatorConfig(
+                relation="reviewer",
+                local_field="reviewer_id"
+            )
+        ]
+    )
+```
+
+!!! tip "Handling Null Values"
+    If a `Document` is saved without a `project_id` (evaluating to `None`), the framework safely ignores it and only generates tuples for fields that actually contain data.
+
+---
+
 ## 1. The Tuple Mapping (Graph)
 This diagram shows how the `FGAModelConfig` dataclass acts as a translation layer, reading soft-reference `UUIDs` from your Django Model and converting them into strict Zanzibar Tuples.
 
@@ -226,53 +288,5 @@ class Document(FGAModelSyncMixin, models.Model):
 ```
 > **Note:** Because the mixin automatically calculates diffs based on the original state versus the new state, custom manual tuples like the one above will need to be manually deleted if `is_public` reverts to `False`.
 
-### Method 2: The View Level
-> Using DRF `perform_create`
-
-If the custom role assignment comes from the HTTP Request (for example, a user selects 3 co-workers in a dropdown to co-author a document), you should handle this in the DRF View using `perform_create`.
-
-You can do this by manually writing to the package's `FGASyncOutbox` table. Because DRF wraps `perform_create` in a transaction by default, this remains 100% atomic and safe.
-
-```python
-# views.py
-from rest_framework import viewsets
-from fga_data_sync.permissions import IsFGAAuthorized
-from fga_data_sync.models import FGASyncOutbox  # Import the Outbox model!
-
-from .models import Document
-from .serializers import DocumentSerializer
-
-class DocumentViewSet(viewsets.ModelViewSet):
-    queryset = Document.objects.all()
-    serializer_class = DocumentSerializer
-    permission_classes = [IsFGAAuthorized]
-    # ... standard fga_config variables ...
-
-    def perform_create(self, serializer):
-        # 1. Save the document normally.
-        # (This triggers the Model Mixin to queue the creator/parent tuples)
-        raw_user_id = self.request.fga_user.replace("user:", "")
-        document = serializer.save(creator_id=raw_user_id)
-
-        # 2. Extract dynamic data from the POST payload
-        # e.g., payload contains: {"title": "My Doc", "extra_editors": ["uuid1", "uuid2"]}
-        extra_editors = self.request.data.get("extra_editors", [])
-
-        # 3. Manually queue custom tuples into the Outbox!
-        for editor_id in extra_editors:
-            FGASyncOutbox.objects.create(
-                action=FGASyncOutbox.Action.WRITE.value,
-                user_id=f"user:{editor_id}",
-                relation="editor",
-                object_id=f"document:{document.id}"
-            )
-
-        # Once the view finishes returning the HTTP Response, the database commits,
-        # and Celery sweeps up BOTH the mixin's tuples and your custom tuples at the same time!
-```
-
-### Method 3: Direct Outbox Manipulation (The "Escape Hatch")
-
-Sometimes, you need to assign a role completely outside the standard Model creation lifecycle (for example, inviting an existing user to an Organization). Because you aren't calling `.save()` on a configured model, you can write relationships directly to the FGA Graph by utilizing the `FGASyncOutbox`.
-
-👉 **See the [Role Assignments Guide](../schema/role-assignments.md) for full code examples on how to dynamically assign roles via Views, Scripts, or M2M tables.**
+!!! tip "Need to assign roles outside of models?"
+    If you need to assign FGA roles via HTTP Requests (View Level) or directly via background tasks, completely bypass the model layer. 👉 **See the [Role Assignments Guide](../schema/role-assignments.md) for full programmatic implementations.**

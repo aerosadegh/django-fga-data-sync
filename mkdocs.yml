@@ -88,8 +88,6 @@ markdown_extensions:
   - footnotes
   - md_in_html
   - tables
-  - pymdownx.tasklist:
-      custom_checkbox: true
   - pymdownx.details # Allows you to make admonitions collapsible (??? info)
   - pymdownx.superfences
   - pymdownx.tabbed: # Enables tabbed content inside your markdown pages
@@ -115,31 +113,31 @@ markdown_extensions:
 nav:
   - Home: index.md
 
-  - Project Architecture & Philosophy:
-    - Philosophy: architecture/philosophy.md
+  - Core Concepts:
+    - Architecture & Philosophy: architecture/philosophy.md
+    - The Zanzibar Model: getting-started/zanzibar-model.md
+    - Authorization Flow: getting-started/authz-flow.md
 
   - Getting Started:
     - Installation & Setup: getting-started/installation.md
     - Traefik Setup: getting-started/docker-traefik.md
-    - Authorization Flow: getting-started/authz-flow.md
-    - Zanzibar Model: getting-started/zanzibar-model.md
 
-  - OpenFGA Schema Design:
+  - "Guides: Schema & Data Modeling":
     - Roles vs. Permissions: schema/design-guide.md
-    - Roles Assignments: schema/role-assignments.md
-    - Architecture: schema/architecture.md
+    - When to Use Local DB Fields: schema/local-db-fields.md  # Renamed internally
 
-  - Examples:
-    - Syncing Models: examples/models.md
+  - "Guides: Implementation":
+    - Syncing Django Models: examples/models.md            # Move multi-parent tutorial here
+    - Assigning Dynamic Roles: schema/role-assignments.md  # Consolidate all manual Outbox/M2M logic here
     - Securing API Views: examples/views.md
     - Stateless Dashboards: examples/stateless-views.md
-    - Nested Hierarchies: examples/advanced-trees.md
+    - Nested Hierarchies (Trees): examples/advanced-trees.md
 
   - API Reference:
-    - Configuration: api/configs.md
-    - Mixins: api/mixins.md
+    - Configuration (Structs): api/configs.md
+    - Mixins: api/mixins.md                                # Strip tutorial content; keep strictly mkdocstrings
     - Permissions: api/permissions.md
-    - Settings: api/settings.md
+    - Settings & Utils: api/settings.md
 
 
 

@@ -58,18 +58,41 @@ Sometimes, you need to assign a role completely outside of a ViewSet (e.g., insi
 You can directly interact with the `FGASyncOutbox` model to queue your own custom tuples. The Celery worker sweeps the Outbox entirely independently of how the records got there.
 
 ```python
-from fga_data_sync.models import FGASyncOutbox
-from users.models import User
+# views.py
+from rest_framework import viewsets
+from fga_data_sync.permissions import IsFGAAuthorized
+from fga_data_sync.models import FGASyncOutbox  # Import the Outbox model!
 
-bob = User.objects.get(email="bob@example.com")
+from .models import Document
+from .serializers import DocumentSerializer
 
-# 1. Manually queue the Role Assignment directly into the Outbox!
-FGASyncOutbox.objects.create(
-    action=FGASyncOutbox.Action.WRITE.value,
-    user_id=f"user:{bob.id}",
-    relation="manager",
-    object_id="organization:org_777"
-)
+class DocumentViewSet(viewsets.ModelViewSet):
+    queryset = Document.objects.all()
+    serializer_class = DocumentSerializer
+    permission_classes = [IsFGAAuthorized]
+    # ... standard fga_config variables ...
+
+    def perform_create(self, serializer):
+        # 1. Save the document normally.
+        # (This triggers the Model Mixin to queue the creator/parent tuples)
+        raw_user_id = self.request.fga_user.replace("user:", "")
+        document = serializer.save(creator_id=raw_user_id)
+
+        # 2. Extract dynamic data from the POST payload
+        # e.g., payload contains: {"title": "My Doc", "extra_editors": ["uuid1", "uuid2"]}
+        extra_editors = self.request.data.get("extra_editors", [])
+
+        # 3. Manually queue custom tuples into the Outbox!
+        for editor_id in extra_editors:
+            FGASyncOutbox.objects.create(
+                action=FGASyncOutbox.Action.WRITE.value,
+                user_id=f"user:{editor_id}",
+                relation="editor",
+                object_id=f"document:{document.id}"
+            )
+
+        # Once the view finishes returning the HTTP Response, the database commits,
+        # and Celery sweeps up BOTH the mixin's tuples and your custom tuples at the same time!
 ```
 
 ### Method 3: The Django M2M Approach
