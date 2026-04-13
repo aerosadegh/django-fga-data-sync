@@ -14,13 +14,13 @@ except importlib.metadata.PackageNotFoundError:
 def __getattr__(name: str) -> Any:
     """
     Lazy loading of exports to avoid Django app registry issues.
-
+    
     Args:
         name: The attribute name being accessed on the module.
-
+        
     Returns:
         Any: The requested class or function.
-
+        
     Raises:
         AttributeError: If the requested attribute does not exist in this module.
     """
