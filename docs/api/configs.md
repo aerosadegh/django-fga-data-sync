@@ -17,6 +17,8 @@ The `FGAViewConfig` dataclass centralizes all OpenFGA authorization rules for yo
     options:
       show_root_heading: false
       heading_level: 4
+      filters:
+        - "!^__post_init__$"
 
 ---
 
@@ -31,13 +33,19 @@ The `FGAModelConfig` dataclass acts as a translation layer. It reads soft-refere
     options:
       show_root_heading: false
       heading_level: 4
+      filters:
+        - "!^__post_init__$"
 
 ::: fga_data_sync.structs.FGAParentConfig
     options:
       show_root_heading: false
       heading_level: 4
+      filters:
+        - "!^__post_init__$"
 
 ::: fga_data_sync.structs.FGACreatorConfig
     options:
       show_root_heading: false
       heading_level: 4
+      filters:
+        - "!^__post_init__$"
