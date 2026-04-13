@@ -10,9 +10,9 @@ build:
     python: "3.12"
   jobs:
     post_install:
-      # Read the Docs uses standard pip by default. Because your MkDocs 
-      # dependencies are defined in a uv-specific [dependency-groups] table 
-      # rather than standard [project.optional-dependencies], we install 
+      # Read the Docs uses standard pip by default. Because your MkDocs
+      # dependencies are defined in a uv-specific [dependency-groups] table
+      # rather than standard [project.optional-dependencies], we install
       # them explicitly here to guarantee the documentation builds securely.
       - pip install mkdocs>=1.6.1 mike>=2.1.4 mkdocs-material>=9.7.6 mkdocstrings[python]>=1.0.3
 
