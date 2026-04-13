@@ -11,12 +11,12 @@ jobs:
   build-and-publish:
     name: Build and Publish Python Package
     runs-on: ubuntu-latest
-    
+
     # Specify the GitHub environment (helpful for deployment protection rules)
     environment:
       name: pypi
       url: https://pypi.org/p/django-fga-data-sync
-    
+
     # Mandatory permissions for OIDC authentication with PyPI
     permissions:
       id-token: write  # Required to request the OIDC JWT token
@@ -46,6 +46,6 @@ jobs:
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          # Optional: Prevents the workflow from failing if you restart a job 
+          # Optional: Prevents the workflow from failing if you restart a job
           # for a version that is already uploaded.
           skip-existing: true

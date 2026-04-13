@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-fga-data-sync"
-version = "0.1.0"
+version = "0.1.1"
 description = "A declarative, outbox-pattern OpenFGA synchronizer for Django models."
 readme = "README.md"
 requires-python = ">=3.11"
