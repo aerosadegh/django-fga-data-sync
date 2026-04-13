@@ -37,10 +37,10 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://django-authz-data-sync.readthedocs.io"
-Homepage = "https://github.com/aerosadegh/django-authz-data-sync"
-Repository = "https://github.com/aerosadegh/django-authz-data-sync"
-"Bug Tracker" = "https://github.com/aerosadegh/django-authz-data-sync/issues"
+Documentation = "https://django-fga-data-sync.readthedocs.io"
+Homepage = "https://github.com/aerosadegh/django-fga-data-sync"
+Repository = "https://github.com/aerosadegh/django-fga-data-sync"
+"Bug Tracker" = "https://github.com/aerosadegh/django-fga-data-sync/issues"
 
 # Optional dependencies for different environments
 [dependency-groups]
