@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-fga-data-sync"
-version = "0.1.2"
+version = "0.1.3"
 description = "A declarative, outbox-pattern OpenFGA synchronizer for Django models."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "GPLv3" }
+license = { text = "GPL-3.0-or-later" }
 authors = [{ name = "Sadegh Yazdani", email = "m.s.yazdani86@gmail.com" }]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -37,9 +37,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://django-fga-data-sync.readthedocs.io"
 Homepage = "https://github.com/aerosadegh/django-fga-data-sync"
 Repository = "https://github.com/aerosadegh/django-fga-data-sync"
+Documentation = "https://django-fga-data-sync.readthedocs.io"
 "Bug Tracker" = "https://github.com/aerosadegh/django-fga-data-sync/issues"
 
 # Optional dependencies for different environments
@@ -68,7 +68,7 @@ packages = ["src/fga_data_sync"]
 # Ruff Configuration (Optional but highly recommended)
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
