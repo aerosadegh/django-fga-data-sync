@@ -65,13 +65,34 @@ Because this package uses the Transactional Outbox pattern, you must have Celery
 The background task (`process_fga_outbox_batch`) is automatically triggered upon a successful database commit. However, as a fail-safe against broker crashes, you should configure a Celery Beat sweeper to run periodically:
 
 ```python
-# celery.py
+# <project_name>/celery.py
+import os
+
+from celery import Celery
 from celery.schedules import crontab
 
+# Set the default Django settings module for the 'celery' program.
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "<project_name>.settings")
+
+app = Celery("<project_name>")
+
+# Using a string here means the worker doesn't have to serialize
+# the configuration object to child processes.
+# - namespace='CELERY' means all celery-related configuration keys
+#   should have a `CELERY_` prefix in settings.py.
+app.config_from_object("django.conf:settings", namespace="CELERY")
+
+# Load task modules from all registered Django apps.
+app.autodiscover_tasks()
+
+# ==========================================
+# FGA Outbox Sweeper Configuration
+# ==========================================
 app.conf.beat_schedule = {
-    'fga-outbox-sweeper': {
-        'task': 'fga_data_sync.tasks.process_fga_outbox_batch',
-        'schedule': crontab(minute='*/5'), # Sweep the Outbox every 5 minutes
+    "fga-outbox-sweeper": {
+        "task": "fga_data_sync.tasks.process_fga_outbox_batch",
+        "schedule": crontab(minute="*/5"),  # Sweep the Outbox every 5 minutes
     },
 }
+
 ```
