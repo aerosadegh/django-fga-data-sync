@@ -84,15 +84,15 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Load task modules from all registered Django apps.
 app.autodiscover_tasks()
+```
 
-# ==========================================
-# FGA Outbox Sweeper Configuration
-# ==========================================
-app.conf.beat_schedule = {
+And for Celery Beat add this task in the `settings.py`:
+```python
+CELERY_BEAT_SCHEDULE = {
     "fga-outbox-sweeper": {
         "task": "fga_data_sync.tasks.process_fga_outbox_batch",
-        "schedule": crontab(minute="*/5"),  # Sweep the Outbox every 5 minutes
+        "schedule": 300.0,  # Sweep the Outbox every 5 minutes
     },
+    ...
 }
-
 ```
