@@ -12,7 +12,7 @@ from .models import FGASyncOutbox
 logger = logging.getLogger(__name__)
 
 # Conditionally register the admin based on the package settings
-if get_setting("ENABLE_OUTBOX_ADMIN"):
+if get_setting("ENABLE_OUTBOX_ADMIN"):  # pragma: no cover
 
     @admin.register(FGASyncOutbox)
     class FGASyncOutboxAdmin(admin.ModelAdmin):
