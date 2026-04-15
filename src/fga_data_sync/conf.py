@@ -14,6 +14,9 @@ DEFAULTS = {
         # "X-Department-Id": "fga_department",
         # "X-Clearance-Level": "fga_clearance",
     },
+    # Enables the Django Admin panel for monitoring the FGA Outbox
+    "ENABLE_OUTBOX_ADMIN": True,
+
     # Tells the Mixins/Permissions which attribute to use for FGA checks
     "FGA_USER_ATTR": "fga_user",
     # Prefix added automatically to the user ID
