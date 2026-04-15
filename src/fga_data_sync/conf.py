@@ -16,11 +16,17 @@ DEFAULTS = {
     },
     # Enables the Django Admin panel for monitoring the FGA Outbox
     "ENABLE_OUTBOX_ADMIN": True,
-
     # Tells the Mixins/Permissions which attribute to use for FGA checks
     "FGA_USER_ATTR": "fga_user",
     # Prefix added automatically to the user ID
     "FGA_USER_PREFIX": "user:",
+    # Local Dev Settings - Remove it for Production!
+    "LOCAL_DEV_FALLBACK": {
+        # If True, falls back to Django's native session/token user if Traefik is missing
+        "USE_DJANGO_USER": True,
+        # Optional: A hardcoded string fallback if you don't want to use the database at all
+        "STATIC_USER_ID": None,
+    },
 }
 
 
