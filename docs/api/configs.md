@@ -11,8 +11,12 @@ There are two primary configuration classes you will use: `FGAModelConfig` (for 
 ::: fga_data_sync.conf.DEFAULTS
     options:
       show_root_heading: true
+      show_source: true
       heading_level: 4
+!!! warning "Setting Variable Name"
+    Avoiding to use `DEFAULT = ...`.
 
+    The correct variable name in the `settings.py` is `FGA_DATA_SYNC = { ... }` !!!
 
 ## 1. View Configuration
 
