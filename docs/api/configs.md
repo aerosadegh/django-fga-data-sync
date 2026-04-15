@@ -6,6 +6,14 @@ There are two primary configuration classes you will use: `FGAModelConfig` (for 
 
 ---
 
+## Configuration Defaults
+
+::: fga_data_sync.conf.DEFAULTS
+    options:
+      show_root_heading: true
+      heading_level: 4
+
+
 ## 1. View Configuration
 
 The `FGAViewConfig` dataclass centralizes all OpenFGA authorization rules for your Django Views and ViewSets. By attaching this configuration to your view, the underlying permission classes (`IsFGAAuthorized`) and mixins (`FGAViewMixin`) automatically enforce access control.
