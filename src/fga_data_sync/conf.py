@@ -14,11 +14,45 @@ DEFAULTS = {
         # "X-Department-Id": "fga_department",
         # "X-Clearance-Level": "fga_clearance",
     },
+    # Enables the Django Admin panel for monitoring the FGA Outbox
+    "ENABLE_OUTBOX_ADMIN": True,
     # Tells the Mixins/Permissions which attribute to use for FGA checks
     "FGA_USER_ATTR": "fga_user",
     # Prefix added automatically to the user ID
     "FGA_USER_PREFIX": "user:",
+    # Local Dev Settings - Remove it for Production!
+    "LOCAL_DEV_FALLBACK": {
+        # If True, falls back to Django's native session/token user if Traefik is missing
+        "USE_DJANGO_USER": True,
+        # Optional: A hardcoded string fallback if you don't want to use the database at all
+        "STATIC_USER_ID": None,
+    },
 }
+"""Sensible defaults for the Django FGA Data Sync integration.
+
+Attributes:
+    OPENFGA_API_URL (str): The endpoint for the OpenFGA server.
+        Defaults to `http://localhost:8080`.
+    OPENFGA_STORE_ID (Optional[str]): The specific OpenFGA Store ID.
+    BATCH_SIZE (int): Number of logs to process in a single synchronization batch.
+         Defaults to `50`.
+    MAX_RETRIES (int): How many times to retry failed synchronization attempts.
+         Defaults to `5`.
+    REQUEST_HEADER_MAPPINGS (Dict[str, str]): Mapping of incoming request
+        headers to FGA context variables.
+    ENABLE_OUTBOX_ADMIN (bool): If True, registers the FGA Outbox model in
+        the Django Admin. Defaults to `True`.
+    FGA_USER_ATTR (str): The attribute on the request/user object to use
+        for FGA identity.
+    FGA_USER_PREFIX (str): Prefix added to user IDs (e.g., `user:123`).
+    LOCAL_DEV_FALLBACK (Dict[str, Any]): Settings for local development
+        when identity providers are absent.
+
+        - **USE_DJANGO_USER**: Fallback to native Django session user.
+             Defaults to `True`.
+        - **STATIC_USER_ID**: A hardcoded ID for rapid testing.
+             Defaults to `None`.
+"""
 
 
 def get_setting(name: str):

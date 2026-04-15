@@ -38,6 +38,7 @@ repos:
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: check-docstring-first
+        exclude: ^src/fga_data_sync/conf\.py$
       - id: debug-statements  # Catches breakpoint(), pdb, etc.
       # Prevent direct commits to main (allow version tags)
       - id: no-commit-to-branch
