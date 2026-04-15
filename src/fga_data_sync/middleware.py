@@ -1,5 +1,11 @@
 # fga_data_sync/middleware.py
+import logging
+
+from django.conf import settings
+
 from .conf import get_setting
+
+logger = logging.getLogger(__name__)
 
 
 class TraefikIdentityMiddleware:
@@ -36,20 +42,38 @@ class TraefikIdentityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        # 1. Fetch the dynamic dictionary and FGA settings
         header_mappings = get_setting("REQUEST_HEADER_MAPPINGS")
         fga_user_attr = get_setting("FGA_USER_ATTR")
-        fga_prefix = get_setting("FGA_USER_PREFIX")
+        fga_prefix = get_setting("FGA_USER_PREFIX")  # e.g., "user:"
 
-        # 2. Iterate through every mapped header (No hard limits!)
+        local_dev_config = get_setting("LOCAL_DEV_FALLBACK")
+
+        # 1. Standard Gateway Extraction
         for header_name, target_attr in header_mappings.items():
             header_value = request.headers.get(header_name)
+
+            # 2. Local Development Fallbacks (If Gateway header is missing)
+            if not header_value and settings.DEBUG:
+                # Fallback A: Use the logged-in Django Database User
+                if (
+                    local_dev_config.get("USE_DJANGO_USER")
+                    and hasattr(request, "user")
+                    and request.user.is_authenticated
+                ):
+                    header_value = str(request.user.id)
+                    logger.debug(f"🛠️ Local Dev: Falling back to Django User -> {header_value}")
+
+                # Fallback B: Use a static string
+                elif local_dev_config.get("STATIC_USER_ID"):
+                    header_value = local_dev_config.get("STATIC_USER_ID")
+                    logger.debug(f"🛠️ Local Dev: Falling back to Static User -> {header_value}")
 
             # 3. Apply the OpenFGA prefix strictly to the user attribute
             if header_value and target_attr == fga_user_attr:
                 header_value = f"{fga_prefix}{header_value}"
 
             # 4. Dynamically attach the attribute to the Django Request
-            setattr(request, target_attr, header_value)
+            if header_value:
+                setattr(request, target_attr, header_value)
 
         return self.get_response(request)
