@@ -5,18 +5,26 @@
 Install the package via pip or uv:
 
 ```bash
-pip install django-fga-data-sync
+pip install django-fga-data-sync django-environ django-celery-beat
 ```
 or
 ```bash
-uv add django-fga-data-sync
+uv add django-fga-data-sync django-environ django-celery-beat
 ```
 
 Add it to your `INSTALLED_APPS` and configure the Traefik middleware in your `settings.py`:
 
 ```python
+import environ
+
+env = environ.Env(
+    # set casting, default value
+    DEBUG=(bool, False)
+)
+
 INSTALLED_APPS = [
     # ... your other apps ...
+    'django_celery_beat', # for outbox pattern
     'fga_data_sync',
 ]
 
@@ -25,6 +33,17 @@ MIDDLEWARE = [
     # Dynamically maps gateway headers to request attributes
     'fga_data_sync.middleware.TraefikIdentityMiddleware',
 ]
+
+
+# Celery Configurations
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
+
+# It is standard practice to use the same Redis instance for results
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default=CELERY_BROKER_URL)
+
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
 ```
 
 Run migrations to create the Outbox table in your database:
@@ -84,6 +103,18 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Load task modules from all registered Django apps.
 app.autodiscover_tasks()
+```
+
+and
+
+```python
+# <project_name>/__init__.py
+
+# This ensures the Celery app is always imported when Django starts.
+# It guarantees that shared_task decorators will use this app instance.
+from .celery import app as celery_app
+
+__all__ = ("celery_app",)
 ```
 
 And for Celery Beat add this task in the `settings.py`:
