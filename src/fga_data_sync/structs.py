@@ -208,6 +208,12 @@ class FGAViewConfig:
         object_type: The OpenFGA type name for objects managed by this view (e.g., "document",
                      "workspace"). Must match the type used in your FGA schema and model
                      configurations. All authorization checks will target this object type.
+        list_relation: The OpenFGA relation required specifically to list objects (GET /api/docs/).
+                       If omitted, the framework safely falls back to using `read_relation`.
+        disable_list_filter: A strict boolean flag to explicitly bypass FGA
+                             filtering on list endpoints.
+                             Set to True when you want any authenticated user to see the full list,
+                             but still protect the detail/update endpoints. Defaults to False.
         read_relation: The OpenFGA relation required to view/list objects (e.g.,
                        "can_read_document", "can_view"). Users must have this permission on the
                        object to include it in query results or retrieve individual instances.
@@ -285,6 +291,39 @@ class FGAViewConfig:
                 "share": "can_share",
                 "archive": "can_archive"
             }
+        )
+        ```
+        ## Read Objects in some patterns:
+        **Pattern 1: Secure by Default (Fallback)**
+
+        Both the List and Detail endpoints are protected by the same permission.
+        ```python
+        FGAViewConfig(
+            object_type="document",
+            read_relation="can_read_document" # Protects both List and Detail views
+        )
+        ```
+
+        **Pattern 2: Granular List vs. Detail Control**
+        Users need a baseline permission to see the list, but a higher tier to read details.
+        ```python
+        FGAViewConfig(
+            object_type="document",
+            list_relation="can_list_documents",       # Protects GET /api/documents/
+            read_relation="can_read_document_detail", # Protects GET /api/documents/1/
+            update_relation="can_update"
+        )
+        ```
+
+        **Pattern 3: Explicit Opt-Out (Public List, Protected Detail)**
+
+        Anyone authenticated can view the list, but FGA strictly protects the details.
+        ```python
+        FGAViewConfig(
+            object_type="company",
+            disable_list_filter=True,            # Bypasses FGA for GET /api/companies/
+            read_relation="can_read_details",    # Protects GET /api/companies/1/
+            update_relation="can_update"
         )
         ```
 
@@ -405,11 +444,15 @@ class FGAViewConfig:
     """
 
     object_type: str
+
+    list_relation: str | None = None
+    disable_list_filter: bool = False  # Explicit opt-out flag
+
     read_relation: str | None = None
     update_relation: str | None = None
     delete_relation: str | None = None
 
-    # 🤠 NEW: Stateless Resolution
+    # Stateless Resolution
     lookup_header: str | None = None  # e.g., "HTTP_X_CONTEXT_ORG_ID"
     lookup_url_kwarg: str | None = None  # e.g., "org_id"
 

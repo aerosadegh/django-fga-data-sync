@@ -34,7 +34,7 @@ Attributes:
     OPENFGA_API_URL (str): The endpoint for the OpenFGA server.
         Defaults to `http://localhost:8080`.
     OPENFGA_STORE_ID (Optional[str]): The specific OpenFGA Store ID.
-    BATCH_SIZE (int): Number of logs to process in a single synchronization batch.
+    BATCH_SIZE (int): Number of items to process in a single synchronization batch.
          Defaults to `50`.
     MAX_RETRIES (int): How many times to retry failed synchronization attempts.
          Defaults to `5`.
