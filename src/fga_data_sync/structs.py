@@ -305,6 +305,7 @@ class FGAViewConfig:
         ```
 
         **Pattern 2: Granular List vs. Detail Control**
+
         Users need a baseline permission to see the list, but a higher tier to read details.
         ```python
         FGAViewConfig(
