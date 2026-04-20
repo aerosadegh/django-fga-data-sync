@@ -107,7 +107,12 @@ markers = [
 branch = true
 source = ["src/fga_data_sync"]
 # Exclude files that do not contain business logic
-omit = ["src/fga_data_sync/apps.py", "*/migrations/*", "__init__.py"]
+omit = [
+    "src/fga_data_sync/apps.py",
+    "src/fga_data_sync/admin.py",
+    "*/migrations/*",
+    "__init__.py"
+]
 
 [tool.coverage.report]
 # Enforce a minimum coverage percentage before CI/CD passes

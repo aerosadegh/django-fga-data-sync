@@ -1,4 +1,5 @@
 import logging
+import warnings
 from typing import Any, Protocol
 
 from django.core.exceptions import ImproperlyConfigured
@@ -56,6 +57,22 @@ class IsFGAAuthorized(permissions.BasePermission):
                 f"@action decorators. Either convert this view to a ViewSet, or remove "
                 f"'action_relations' from the config."
             )
+
+        if config.list_relation or config.disable_list_filter:
+            # Safely check if the view inherits from FGAViewMixin without causing circular imports
+            has_mixin = any(cls.__name__ == "FGAViewMixin" for cls in view.__class__.__mro__)
+
+            if not has_mixin:
+                msg = (
+                    f"View '{view.__class__.__name__}' uses 'list_relation' or "
+                    f"'disable_list_filter' in its FGAViewConfig, but does not inherit "
+                    f"from 'FGAViewMixin'. The 'IsFGAAuthorized' permission class "
+                    f"cannot filter lists and will safely ignore these settings."
+                )
+                logger.warning(msg)  # Logs to your standard Django logging pipeline
+                warnings.warn(
+                    msg, UserWarning, stacklevel=2
+                )  # Throws yellow text in the runserver terminal
         return config
 
     def has_permission(self, request: Request, view: APIView | FGAConfiguredView) -> bool:

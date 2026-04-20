@@ -210,10 +210,14 @@ class FGAViewConfig:
                      configurations. All authorization checks will target this object type.
         list_relation: The OpenFGA relation required specifically to list objects (GET /api/docs/).
                        If omitted, the framework safely falls back to using `read_relation`.
+                       **Note**: *This argument is exclusively consumed by `FGAViewMixin` to filter
+                       querysets. It is ignored by the `IsFGAAuthorized` permission class.*
         disable_list_filter: A strict boolean flag to explicitly bypass FGA
                              filtering on list endpoints.
                              Set to True when you want any authenticated user to see the full list,
                              but still protect the detail/update endpoints. Defaults to False.
+                             **Note**: *This argument is exclusively consumed by `FGAViewMixin`.
+                             It is ignored by the `IsFGAAuthorized` permission class.*
         read_relation: The OpenFGA relation required to view/list objects (e.g.,
                        "can_read_document", "can_view"). Users must have this permission on the
                        object to include it in query results or retrieve individual instances.
