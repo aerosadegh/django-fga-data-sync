@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "django-fga-data-sync"
-version = "0.1.6"
+version = "0.1.7"
 description = "A declarative, outbox-pattern OpenFGA synchronizer for Django models."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -107,7 +107,12 @@ markers = [
 branch = true
 source = ["src/fga_data_sync"]
 # Exclude files that do not contain business logic
-omit = ["src/fga_data_sync/apps.py", "*/migrations/*", "__init__.py"]
+omit = [
+    "src/fga_data_sync/apps.py",
+    "src/fga_data_sync/admin.py",
+    "*/migrations/*",
+    "__init__.py"
+]
 
 [tool.coverage.report]
 # Enforce a minimum coverage percentage before CI/CD passes

@@ -327,6 +327,37 @@ class TestIsFGAAuthorized:
         called_request = mock_fga_client.check.call_args[0][0]
         assert called_request.object == "organization:stark_industries"
 
+    def test_guardrail_list_configs_without_mixin_warns(self, api_rf):
+        """
+        Verifies a UserWarning is emitted if list configurations are used
+        on a view that does not inherit from FGAViewMixin.
+        """
+        view = DummyProtectedView()
+
+        # 🤠 Deliberately misconfigure the view by adding list_relation
+        view.fga_config = FGAViewConfig(
+            object_type="folder",
+            read_relation="can_read",
+            list_relation="can_list_explicit",
+        )
+
+        request = api_rf.get("/dummy/1/")
+        request.fga_user = "user:bob"
+
+        perm = IsFGAAuthorized()
+
+        # Capture the warning emitted by the Python warnings library
+        with pytest.warns(UserWarning) as record:
+            perm._get_config(view)
+
+        # Mathematical Proof: Exactly one warning was fired, containing the exact DX instructions
+        assert len(record) == 1
+        warning_msg = str(record[0].message)
+
+        assert "uses 'list_relation' or 'disable_list_filter'" in warning_msg
+        assert "does not inherit from 'FGAViewMixin'" in warning_msg
+        assert "will safely ignore these settings" in warning_msg
+
 
 # Finance App Test
 

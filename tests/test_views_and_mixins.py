@@ -238,3 +238,47 @@ class TestViewsAndMixins:
 
         # It should queue 2 DELETE tasks (1 for the parent, 1 for the creator)
         assert FGASyncOutbox.objects.filter(action=FGASyncOutbox.Action.DELETE).count() == 2
+
+    def test_fgaviewmixin_list_relation_override(self, api_rf, mock_fga_client):
+        """Verifies list_relation takes precedence over read_relation when filtering lists."""
+        view = DummyFGAViewMixin()
+        view.request = api_rf.get("/dummy/")
+        view.request.fga_user = "user:bob"
+        view.kwargs = {}  # Empty kwargs implies a List route
+
+        # 🤠 Override the config to test the separation
+        view.fga_config = FGAViewConfig(
+            object_type="folder",
+            read_relation="can_read_detail",
+            list_relation="can_list_specifically",
+        )
+
+        mock_fga_client.list_objects.return_value.objects = []
+        view.get_queryset()
+
+        # Mathematical Proof: The network check MUST use 'can_list_specifically'
+        mock_fga_client.list_objects.assert_called_once()
+        called_request = mock_fga_client.list_objects.call_args[0][0]
+        assert called_request.relation == "can_list_specifically"
+
+    def test_fgaviewmixin_disable_list_filter(self, api_rf, mock_fga_client):
+        """Verifies that disable_list_filter=True entirely bypasses OpenFGA network checks."""
+        view = DummyFGAViewMixin()
+        view.request = api_rf.get("/dummy/")
+        view.request.fga_user = "user:bob"
+        view.kwargs = {}
+
+        # 🤠 Override the config to explicitly opt-out of list filtering
+        view.fga_config = FGAViewConfig(
+            object_type="folder",
+            read_relation="can_read_detail",
+            disable_list_filter=True,
+        )
+
+        qs = view.get_queryset()
+
+        # Mathematical Proof: The network check MUST NOT be called
+        mock_fga_client.list_objects.assert_not_called()
+
+        # Mathematical Proof: The queryset MUST NOT be filtered
+        assert str(qs.query) == str(view.queryset.all().query)
