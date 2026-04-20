@@ -128,6 +128,10 @@ class FGAModelSyncMixin:
 
     def __init__(self, *args: Any, **kwargs: Any):
         super().__init__(*args, **kwargs)
+        if self.fga_config is None:
+            raise ImproperlyConfigured(
+                f"'{self.__class__.__name__}' must define an 'fga_config' attribute."
+            )
         # Delegate tuple generation to the adapter
         self._original_tuples = (
             FGATupleAdapter.generate_tuples(self, self.fga_config) if self.pk else []
@@ -135,10 +139,14 @@ class FGAModelSyncMixin:
         self._fga_task_scheduled = False
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        is_new = self.pk is None
+        is_new = self._state.adding  # type: ignore[attr-defined]
 
         with transaction.atomic():
             super().save(*args, **kwargs)  # type: ignore[misc]
+            if self.fga_config is None:
+                raise ImproperlyConfigured(
+                    f"'{self.__class__.__name__}' must define an 'fga_config' attribute."
+                )
             current_tuples = FGATupleAdapter.generate_tuples(self, self.fga_config)
 
             if is_new:
@@ -159,6 +167,10 @@ class FGAModelSyncMixin:
 
     def delete(self, *args: Any, **kwargs: Any) -> None:
         with transaction.atomic():
+            if self.fga_config is None:
+                raise ImproperlyConfigured(
+                    f"'{self.__class__.__name__}' must define an 'fga_config' attribute."
+                )
             for t in FGATupleAdapter.generate_tuples(self, self.fga_config):
                 self._queue_outbox(FGASyncOutbox.Action.DELETE, t)  # type: ignore[arg-type]
             super().delete(*args, **kwargs)  # type: ignore[misc]
@@ -266,17 +278,26 @@ class FGAViewMixin:
         queryset = super().get_queryset()
         view_kwargs = getattr(self, "kwargs", {})
 
-        # Only apply FGA filtering if this is a List request
+        # 1. Bypass if this is a Detail request (e.g., /api/companies/1/)
         if view_kwargs.get(self.lookup_field):
             return queryset
 
         config = self._get_config()
-        if config.object_type and config.read_relation:
+
+        # Explicitly bypass FGA filtering if the developer requested an open list
+        if config.disable_list_filter:
+            return queryset
+
+        # 3. Fallback logic for backward compatibility
+        relation_to_check = config.list_relation or config.read_relation
+
+        # 4. Perform the OpenFGA network check
+        if config.object_type and relation_to_check:
             client = get_fga_client()
             response = client.list_objects(
                 ClientListObjectsRequest(
                     user=self._get_fga_user(),
-                    relation=config.read_relation,
+                    relation=relation_to_check,
                     type=config.object_type,
                 )
             )
