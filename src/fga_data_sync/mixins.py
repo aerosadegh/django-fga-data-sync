@@ -1,18 +1,18 @@
 # fga_data_sync/mixins.py
-import logging
 import uuid
-import warnings
 from typing import Any, ClassVar
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
 from openfga_sdk.client.models import ClientCheckRequest, ClientListObjectsRequest
+from openfga_sdk.exceptions import ValidationException
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.request import Request
 from rest_framework.viewsets import ViewSetMixin
 
 from .adapters import FGATupleAdapter
 from .conf import get_setting
+from .loggers import FGAConsoleLogger
 from .models import FGASyncOutbox
 from .structs import FGAModelConfig, FGAViewConfig
 from .tasks import process_fga_outbox_batch
@@ -23,7 +23,7 @@ __all__ = [
     "FGAViewMixin",
 ]
 
-logger = logging.getLogger(__name__)
+logger = FGAConsoleLogger(__name__)
 
 
 class FGAModelSyncMixin:
@@ -242,16 +242,13 @@ class FGAViewMixin:
 
         permission_classes = getattr(self, "permission_classes", [])
         if IsFGAAuthorized in permission_classes:
-            msg = (
+            # The FGAConsoleLogger handles all the colors and prefixes.
+            logger.warning(
                 f"Duplicate FGA Authorization detected on '{self.__class__.__name__}'. "
-                f"You are using both FGAViewMixin and IsFGAAuthorized. "
+                f"You are using both 'FGAViewMixin' and 'IsFGAAuthorized'. "
                 f"This will result in redundant network calls to OpenFGA. "
-                f"Please remove IsFGAAuthorized from permission_classes."
+                f"Please remove 'IsFGAAuthorized' from 'permission_classes'."
             )
-            # Log as a warning to the console
-            logger.warning(msg)
-            # Optionally, trigger a runtime warning that shows up in the dev server output
-            warnings.warn(msg, UserWarning, stacklevel=2)
 
     def _get_fga_user(self) -> str:
         user_attr = get_setting("FGA_USER_ATTR")
@@ -294,13 +291,23 @@ class FGAViewMixin:
         # 4. Perform the OpenFGA network check
         if config.object_type and relation_to_check:
             client = get_fga_client()
-            response = client.list_objects(
-                ClientListObjectsRequest(
-                    user=self._get_fga_user(),
-                    relation=relation_to_check,
-                    type=config.object_type,
+            try:
+                response = client.list_objects(
+                    ClientListObjectsRequest(
+                        user=self._get_fga_user(),
+                        relation=relation_to_check,
+                        type=config.object_type,
+                    )
                 )
-            )
+            except ValidationException as e:
+                error_msg = (
+                    f"FGA DSL Mismatch: The relation '{relation_to_check}' on type "
+                    f"'{config.object_type}' does not exist in your OpenFGA schema. "
+                    f"Please update your DSL or fix your FGAViewConfig."
+                )
+                logger.error(error_msg)
+                raise ImproperlyConfigured(error_msg) from e
+
             prefix = f"{config.object_type}:"
             allowed_ids = [obj.replace(prefix, "") for obj in response.objects]
             return queryset.filter(id__in=allowed_ids)
@@ -317,15 +324,27 @@ class FGAViewMixin:
                 raise PermissionDenied(
                     f"Payload must include parent field: '{config.create_parent_field}'"
                 )
+            if config.create_relation is None:
+                raise ImproperlyConfigured("FGAViewConfig must have all `create_*` keys together.")
 
             client = get_fga_client()
-            response = client.check(
-                ClientCheckRequest(
-                    user=self._get_fga_user(),
-                    relation=config.create_relation,
-                    object=f"{config.create_parent_type}:{parent_id}",
+            try:
+                response = client.check(
+                    ClientCheckRequest(
+                        user=self._get_fga_user(),
+                        relation=config.create_relation,
+                        object=f"{config.create_parent_type}:{parent_id}",
+                    )
                 )
-            )
+            except ValidationException as e:
+                error_msg = (
+                    f"FGA DSL Mismatch: The relation '{config.create_relation}' on type "
+                    f"'{config.create_parent_type}' does not exist in your OpenFGA schema. "
+                    f"Please update your DSL or fix your FGAViewConfig."
+                )
+                logger.error(error_msg)
+                raise ImproperlyConfigured(error_msg) from e
+
             if not response.allowed:
                 raise PermissionDenied(
                     f"You must be '{config.create_relation}' on '{config.create_parent_type}'"
@@ -358,12 +377,21 @@ class FGAViewMixin:
 
         if config.object_type and relation:
             client = get_fga_client()
-            response = client.check(
-                ClientCheckRequest(
-                    user=self._get_fga_user(),
-                    relation=relation,
-                    object=f"{config.object_type}:{obj.pk}",
+            try:
+                response = client.check(
+                    ClientCheckRequest(
+                        user=self._get_fga_user(),
+                        relation=relation,
+                        object=f"{config.object_type}:{obj.pk}",
+                    )
                 )
-            )
+            except ValidationException as e:
+                error_msg = (
+                    f"FGA DSL Mismatch: The relation '{relation}' on type "
+                    f"'{config.object_type}' does not exist in your OpenFGA schema. "
+                    f"Please update your DSL or fix your FGAViewConfig."
+                )
+                logger.error(error_msg)
+                raise ImproperlyConfigured(error_msg) from e
             if not response.allowed:
                 raise PermissionDenied(f"You do not have '{relation}' access to this object.")

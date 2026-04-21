@@ -1,8 +1,10 @@
 # tests/test_permissions.py
+import logging
 from typing import ClassVar
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from openfga_sdk.exceptions import ValidationException
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSetMixin
@@ -260,7 +262,7 @@ class TestIsFGAAuthorized:
         """
         view = DummyProtectedView()
 
-        # 🤠 Override config for stateless URL resolution
+        # Override config for stateless URL resolution
         view.fga_config = FGAViewConfig(
             object_type="organization",
             read_relation="can_view",
@@ -298,7 +300,7 @@ class TestIsFGAAuthorized:
         """
         view = DummyProtectedView()
 
-        # 🤠 Override config for stateless Header resolution
+        # Override config for stateless Header resolution
         view.fga_config = FGAViewConfig(
             object_type="organization",
             read_relation="can_view",
@@ -327,14 +329,14 @@ class TestIsFGAAuthorized:
         called_request = mock_fga_client.check.call_args[0][0]
         assert called_request.object == "organization:stark_industries"
 
-    def test_guardrail_list_configs_without_mixin_warns(self, api_rf):
+    def test_guardrail_list_configs_without_mixin_warns(self, api_rf, caplog):
         """
-        Verifies a UserWarning is emitted if list configurations are used
+        Verifies a logger warning is emitted if list configurations are used
         on a view that does not inherit from FGAViewMixin.
         """
         view = DummyProtectedView()
 
-        # 🤠 Deliberately misconfigure the view by adding list_relation
+        # Deliberately misconfigure the view by adding list_relation
         view.fga_config = FGAViewConfig(
             object_type="folder",
             read_relation="can_read",
@@ -346,17 +348,65 @@ class TestIsFGAAuthorized:
 
         perm = IsFGAAuthorized()
 
-        # Capture the warning emitted by the Python warnings library
-        with pytest.warns(UserWarning) as record:
+        # Capture standard logger output instead of Python warnings
+        with caplog.at_level(logging.WARNING):
             perm._get_config(view)
 
-        # Mathematical Proof: Exactly one warning was fired, containing the exact DX instructions
-        assert len(record) == 1
-        warning_msg = str(record[0].message)
+        # Mathematical Proof: The log was fired, containing the exact DX instructions
+        assert "uses 'list_relation' or 'disable_list_filter'" in caplog.text
+        assert "does not inherit from 'FGAViewMixin'" in caplog.text
+        assert "will safely ignore these settings" in caplog.text
 
-        assert "uses 'list_relation' or 'disable_list_filter'" in warning_msg
-        assert "does not inherit from 'FGAViewMixin'" in warning_msg
-        assert "will safely ignore these settings" in warning_msg
+    def test_permission_dsl_mismatch_raises_improperly_configured(self, api_rf, mock_fga_client):
+        """Verifies that an OpenFGA ValidationException triggers the DX guardrail in permissions."""
+
+        view = DummyProtectedView()
+        request = api_rf.get("/dummy/1/")
+        request.fga_user = "user:bob"
+
+        perm = IsFGAAuthorized()
+
+        # 1. Force the OpenFGA SDK to throw the missing relation error
+        mock_fga_client.check.side_effect = ValidationException("relation_not_found")
+
+        # 2. Mathematical Proof: The permission caught it and raised the clean Django exception
+        with pytest.raises(ImproperlyConfigured, match="FGA DSL Mismatch"):
+            perm.has_object_permission(request, view, MockFolder(id=1))
+
+    def test_permission_parent_check_validation_error(self, api_rf, mock_fga_client):
+        """Verifies that a missing DSL relation on POST parent check triggers the guardrail."""
+        view = DummyProtectedView()
+        wsgi_request = api_rf.post("/dummy/", {"org_id": "org_777"}, format="json")
+
+        # Wrap the raw WSGIRequest into a DRF Request to enable `.data` parsing
+        drf_request = view.initialize_request(wsgi_request)
+        drf_request.fga_user = "user:bob"
+
+        # Force the SDK to throw the missing relation error
+        mock_fga_client.check.side_effect = ValidationException("relation_not_found")
+
+        with pytest.raises(ImproperlyConfigured, match="FGA DSL Mismatch"):
+            # Execute the DRF permission check explicitly using the DRF request
+            IsFGAAuthorized().has_permission(drf_request, view)
+
+    def test_permission_object_check_validation_error(self, api_rf, mock_fga_client):
+        """Verifies that a missing DSL relation on an object check triggers the guardrail."""
+        view = DummyProtectedView()
+
+        # We are testing a PUT request, so we MUST assign an update_relation.
+        # Otherwise, the permission class assumes it's an explicit opt-out and bypasses FGA!
+        view.fga_config = FGAViewConfig(object_type="folder", update_relation="can_update_folder")
+
+        wsgi_request = api_rf.put("/dummy/1/", {"title": "Updated"}, format="json")
+
+        # Wrap the request for DRF
+        drf_request = view.initialize_request(wsgi_request)
+        drf_request.fga_user = "user:bob"
+
+        mock_fga_client.check.side_effect = ValidationException("relation_not_found")
+
+        with pytest.raises(ImproperlyConfigured, match="FGA DSL Mismatch"):
+            IsFGAAuthorized().has_object_permission(drf_request, view, MockFolder(id=1))
 
 
 # Finance App Test
