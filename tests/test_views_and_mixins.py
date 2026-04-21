@@ -1,5 +1,7 @@
 # tests/test_views_and_mixins.py
 import pytest
+from django.core.exceptions import ImproperlyConfigured
+from openfga_sdk.exceptions import ValidationException
 from rest_framework import generics
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 
@@ -282,3 +284,48 @@ class TestViewsAndMixins:
 
         # Mathematical Proof: The queryset MUST NOT be filtered
         assert str(qs.query) == str(view.queryset.all().query)
+
+    def test_fgaviewmixin_dsl_mismatch_raises_improperly_configured(self, api_rf, mock_fga_client):
+        """Verifies that an OpenFGA ValidationException triggers our DX guardrail."""
+        view = DummyFGAViewMixin()
+        view.request = api_rf.get("/dummy/")
+        view.request.fga_user = "user:bob"
+        view.kwargs = {}
+
+        # 1. Force the OpenFGA SDK to throw the missing relation error
+        mock_fga_client.list_objects.side_effect = ValidationException("relation_not_found")
+
+        # 2. Mathematical Proof: The mixin caught it and raised the clean Django exception
+        with pytest.raises(ImproperlyConfigured, match="FGA DSL Mismatch"):
+            view.get_queryset()
+
+    def test_fgaviewmixin_parent_check_validation_error(self, api_rf, mock_fga_client):
+        """Verifies that a missing DSL relation on POST parent check raises ImproperlyConfigured."""
+        wsgi_request = api_rf.post("/dummy/", {"org_id": "org_999"}, format="json")
+        view = DummyFGAViewMixin()
+        drf_request = view.initialize_request(wsgi_request)
+        drf_request.fga_user = "user:bob"
+        view.request = drf_request
+
+        # Force the SDK to throw the missing relation error during a parent check
+        mock_fga_client.check.side_effect = ValidationException("relation_not_found")
+
+        with pytest.raises(ImproperlyConfigured, match="FGA DSL Mismatch"):
+            view.check_permissions(drf_request)
+
+    def test_fgaviewmixin_object_check_validation_error(self, api_rf, mock_fga_client):
+        """Verifies that a missing DSL relation on an object check raises ImproperlyConfigured."""
+
+        folder = MockFolder.objects.create(name="F1", org_id="o1", creator_id="u1")
+        request = api_rf.put(f"/dummy/{folder.id}/", {})
+        request.fga_user = "user:bob"
+
+        view = DummyFGAViewMixin()
+        view.request = request
+        view.kwargs = {"pk": folder.id}
+
+        # Force the SDK to throw the missing relation error during an object check
+        mock_fga_client.check.side_effect = ValidationException("relation_not_found")
+
+        with pytest.raises(ImproperlyConfigured, match="FGA DSL Mismatch"):
+            view.check_object_permissions(request, folder)

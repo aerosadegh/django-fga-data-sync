@@ -1,19 +1,19 @@
-import logging
-import warnings
 from typing import Any, Protocol
 
 from django.core.exceptions import ImproperlyConfigured
 from openfga_sdk.client.models import ClientCheckRequest
+from openfga_sdk.exceptions import ValidationException
 from rest_framework import permissions
 from rest_framework.request import Request
 from rest_framework.views import APIView
 from rest_framework.viewsets import ViewSetMixin
 
 from .conf import get_setting
+from .loggers import FGAConsoleLogger
 from .structs import FGAViewConfig
 from .utils import get_fga_client
 
-logger = logging.getLogger(__name__)
+logger = FGAConsoleLogger(__name__)
 
 
 class FGAConfiguredView(Protocol):
@@ -59,20 +59,16 @@ class IsFGAAuthorized(permissions.BasePermission):
             )
 
         if config.list_relation or config.disable_list_filter:
-            # Safely check if the view inherits from FGAViewMixin without causing circular imports
             has_mixin = any(cls.__name__ == "FGAViewMixin" for cls in view.__class__.__mro__)
 
             if not has_mixin:
-                msg = (
+                logger.warning(
                     f"View '{view.__class__.__name__}' uses 'list_relation' or "
                     f"'disable_list_filter' in its FGAViewConfig, but does not inherit "
                     f"from 'FGAViewMixin'. The 'IsFGAAuthorized' permission class "
                     f"cannot filter lists and will safely ignore these settings."
                 )
-                logger.warning(msg)  # Logs to your standard Django logging pipeline
-                warnings.warn(
-                    msg, UserWarning, stacklevel=2
-                )  # Throws yellow text in the runserver terminal
+
         return config
 
     def has_permission(self, request: Request, view: APIView | FGAConfiguredView) -> bool:
@@ -106,8 +102,8 @@ class IsFGAAuthorized(permissions.BasePermission):
                 )
                 return False
 
+            client = get_fga_client()
             try:
-                client = get_fga_client()
                 response = client.check(
                     ClientCheckRequest(
                         user=fga_user,
@@ -116,6 +112,14 @@ class IsFGAAuthorized(permissions.BasePermission):
                     )
                 )
                 return bool(response.allowed)
+            except ValidationException as e:
+                error_msg = (
+                    f"FGA DSL Mismatch: The relation '{config.create_relation}' on type "
+                    f"'{config.create_parent_type}' does not exist in your OpenFGA schema. "
+                    f"Please update your DSL or fix your FGAViewConfig."
+                )
+                logger.error(error_msg)
+                raise ImproperlyConfigured(error_msg) from e
             except (ValueError, ConnectionError, TimeoutError) as e:
                 logger.error(f"FGA network or validation error during parent check: {e}")
                 return False
@@ -204,6 +208,14 @@ class IsFGAAuthorized(permissions.BasePermission):
                 )
             )
             return bool(response.allowed)
+        except ValidationException as e:
+            error_msg = (
+                f"FGA DSL Mismatch: The relation '{required_relation}' on type "
+                f"'{config.object_type}' does not exist in your OpenFGA schema. "
+                f"Please update your DSL or fix your FGAViewConfig."
+            )
+            logger.error(error_msg)
+            raise ImproperlyConfigured(error_msg) from e
         except (ValueError, AttributeError, ConnectionError, TimeoutError) as e:
             logger.error(f"FGA network or validation error during object check: {e}")
             return False
