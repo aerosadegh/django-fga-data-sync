@@ -408,6 +408,48 @@ class TestIsFGAAuthorized:
         with pytest.raises(ImproperlyConfigured, match="FGA DSL Mismatch"):
             IsFGAAuthorized().has_object_permission(drf_request, view, MockFolder(id=1))
 
+    def test_post_creation_model_property_fallback(self, api_rf, mock_fga_client):
+        """Verifies POST creation falls back to instantiating the model to read a property."""
+
+        # 1. Mock the Django Model and QuerySet architecture
+        class MockCompanyModel:
+            @property
+            def platform_id(self):
+                return "model_provided_global_id"
+
+        class MockQuerySet:
+            model = MockCompanyModel
+
+        # 2. Mock a View that possesses this QuerySet
+        class PropertyFallbackView(APIView):
+            queryset = MockQuerySet()
+
+        view = PropertyFallbackView()
+        view.fga_config = FGAViewConfig(
+            object_type="company",
+            create_parent_type="platform",
+            create_parent_field="platform_id",
+            create_relation="can_create",
+        )
+
+        # Payload is explicitly empty, forcing the fallback!
+        wsgi_request = api_rf.post("/dummy/", {}, format="json")
+
+        # Wrap the raw WSGIRequest into a DRF Request to enable `.data` parsing
+        drf_request = view.initialize_request(wsgi_request)
+        drf_request.fga_user = "user:bob"
+
+        mock_fga_client.check.return_value.allowed = True
+        perm = IsFGAAuthorized()
+
+        # Pass the DRF request into the permission check!
+        assert perm.has_permission(drf_request, view) is True
+
+        called_request = mock_fga_client.check.call_args[0][0]
+
+        # Mathematical Proof: It instantiated the model and read the property
+        assert called_request.object == "platform:model_provided_global_id"
+
 
 # Finance App Test
 

@@ -96,6 +96,27 @@ class IsFGAAuthorized(permissions.BasePermission):
             parent_field = str(config.create_parent_field)
             parent_id: str | None = request.data.get(parent_field)
 
+            # Model Instantiation Fallback
+            if not parent_id:
+                try:
+                    model_class = None
+
+                    # 1. Safely extract the attribute to a local variable to satisfy MyPy
+                    view_queryset = getattr(view, "queryset", None)
+                    get_qs_func = getattr(view, "get_queryset", None)
+
+                    if view_queryset is not None:
+                        model_class = view_queryset.model
+                    elif callable(get_qs_func):
+                        model_class = get_qs_func().model
+
+                    # 3. Instantiate an empty dummy instance and read the property
+                    if model_class:
+                        dummy_instance = model_class()
+                        parent_id = getattr(dummy_instance, parent_field, None)
+                except Exception as e:  # pragma: no cover
+                    logger.debug(f"Failed to resolve {parent_field} from model fallback: {e}")
+
             if not parent_id:
                 logger.warning(
                     f"FGA Authorization denied: Missing parent field '{parent_field}' in payload."

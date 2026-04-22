@@ -1,4 +1,7 @@
 # tests/test_views_and_mixins.py
+import logging
+from typing import ClassVar
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from openfga_sdk.exceptions import ValidationException
@@ -7,6 +10,7 @@ from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 
 from fga_data_sync.mixins import FGAViewMixin
 from fga_data_sync.models import FGASyncOutbox
+from fga_data_sync.permissions import IsFGAAuthorized
 from fga_data_sync.structs import FGAViewConfig
 from tests.models import MockFolder
 
@@ -329,3 +333,130 @@ class TestViewsAndMixins:
 
         with pytest.raises(ImproperlyConfigured, match="FGA DSL Mismatch"):
             view.check_object_permissions(request, folder)
+
+    def test_fgaviewmixin_post_creation_model_property_fallback(self, api_rf, mock_fga_client):
+        """Verifies the Mixin falls back to instantiating the model to read a property."""
+
+        # 1. Mock the Django Model and QuerySet architecture
+        class MockCompanyModel:
+            @property
+            def platform_id(self):
+                return "model_provided_global_id"
+
+        class MockQuerySet:
+            model = MockCompanyModel
+
+        # 2. Mock a View that inherits from our Mixin
+        class PropertyFallbackMixinView(FGAViewMixin, generics.GenericAPIView):
+            queryset = MockQuerySet()
+
+        wsgi_request = api_rf.post("/dummy/", {}, format="json")
+
+        view = PropertyFallbackMixinView()
+        view.fga_config = FGAViewConfig(
+            object_type="company",
+            create_parent_type="platform",
+            create_parent_field="platform_id",
+            create_relation="can_create",
+        )
+
+        # Standard DRF setup
+        drf_request = view.initialize_request(wsgi_request)
+        drf_request.fga_user = "user:bob"
+        view.request = drf_request
+
+        mock_fga_client.check.return_value.allowed = True
+
+        # Should not raise an exception
+        view.check_permissions(drf_request)
+
+        called_request = mock_fga_client.check.call_args[0][0]
+
+        # Mathematical Proof: It instantiated the model and read the property
+        assert called_request.object == "platform:model_provided_global_id"
+
+    def test_fgaviewmixin_duplicate_auth_warning(self, api_rf, caplog):
+        """Verifies a warning is emitted if IsFGAAuthorized is used alongside FGAViewMixin."""
+
+        class BadView(FGAViewMixin, generics.GenericAPIView):
+            permission_classes: ClassVar[list] = [IsFGAAuthorized]
+            fga_config = FGAViewConfig(object_type="folder")
+
+        with caplog.at_level(logging.WARNING):
+            BadView()
+
+        assert "Duplicate FGA Authorization detected" in caplog.text
+
+    def test_fgaviewmixin_missing_view_config(self, api_rf):
+        """Verifies missing config crashes gracefully."""
+        from rest_framework import generics
+
+        class BadView(FGAViewMixin, generics.GenericAPIView):
+            fga_config = None  # Missing config!
+
+        view = BadView()
+        with pytest.raises(
+            ImproperlyConfigured, match="must define `fga_config` of type `FGAViewConfig`"
+        ):
+            view._get_config()
+
+    def test_fgaviewmixin_delete_method_maps_correctly(self, api_rf, mock_fga_client):
+        """Verifies DELETE requests correctly use delete_relation."""
+        folder = MockFolder.objects.create(name="F1", org_id="o1", creator_id="u1")
+        request = api_rf.delete(f"/dummy/{folder.id}/")
+        request.fga_user = "user:bob"
+
+        view = DummyFGAViewMixin()
+        view.request = request
+        view.kwargs = {"pk": folder.id}
+
+        mock_fga_client.check.return_value.allowed = True
+        view.check_object_permissions(request, folder)
+
+        mock_fga_client.check.assert_called_once()
+        called_request = mock_fga_client.check.call_args[0][0]
+        assert called_request.relation == "can_delete"
+
+    def test_fgaviewmixin_get_method_maps_correctly(self, api_rf, mock_fga_client):
+        """Verifies GET requests correctly use read_relation."""
+        folder = MockFolder.objects.create(name="F1", org_id="o1", creator_id="u1")
+        request = api_rf.get(f"/dummy/{folder.id}/")
+        request.fga_user = "user:bob"
+
+        view = DummyFGAViewMixin()
+        view.request = request
+        view.kwargs = {"pk": folder.id}
+
+        mock_fga_client.check.return_value.allowed = True
+        view.check_object_permissions(request, folder)
+
+        mock_fga_client.check.assert_called_once()
+        called_request = mock_fga_client.check.call_args[0][0]
+        assert called_request.relation == "can_list"  # Based on DummyFGAViewMixin config
+
+    def test_fgaviewmixin_lookup_header_routes_to_object_permissions(self, api_rf, mock_fga_client):
+        """Verifies stateless routing works perfectly for mixins."""
+        request = api_rf.get("/dummy/", HTTP_X_CONTEXT_ORG_ID="acme_123")
+        request.fga_user = "user:bob"
+
+        view = DummyFGAViewMixin()
+        view.request = request
+        view.kwargs = {}
+
+        # Override config to use lookup_header statelessly
+        view.fga_config = FGAViewConfig(
+            object_type="organization",
+            read_relation="can_read",
+            lookup_header="HTTP_X_CONTEXT_ORG_ID",
+        )
+
+        mock_fga_client.check.return_value.allowed = True
+
+        # This triggers `check_object_permissions(request, obj=None)` internally
+        view.check_permissions(request)
+
+        mock_fga_client.check.assert_called_once()
+        called_request = mock_fga_client.check.call_args[0][0]
+
+        # Mathematical Proof: It evaluated the header, not an object ID
+        assert called_request.object == "organization:acme_123"

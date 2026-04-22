@@ -1,8 +1,10 @@
 # tests/test_mixins.py
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.db import models
 
 from fga_data_sync.adapters import FGATupleAdapter
+from fga_data_sync.mixins import FGAModelSyncMixin
 from fga_data_sync.models import FGASyncOutbox
 
 from .models import MockFolder, MockOrganization
@@ -106,3 +108,26 @@ class TestFGAModelSyncMixin:
 
         # It should queue 2 DELETE tasks (1 for the parent, 1 for the creator)
         assert FGASyncOutbox.objects.filter(action=FGASyncOutbox.Action.DELETE).count() == 2
+
+    def test_fgamodelsyncmixin_init_missing_config(self):
+        """Verifies __init__ raises ImproperlyConfigured if fga_config is missing."""
+
+        class BadModel(FGAModelSyncMixin, models.Model):
+            class Meta:
+                app_label = "fga_data_sync"
+
+        with pytest.raises(ImproperlyConfigured, match="must define an 'fga_config' attribute"):
+            BadModel()
+
+    def test_fgamodelsyncmixin_save_delete_missing_config(self):
+        """Verifies save and delete raise ImproperlyConfigured if mutated."""
+        folder = MockFolder(name="Test", org_id="org1", creator_id="user1")
+
+        # Sabotage the config after instantiation
+        folder.fga_config = None
+
+        with pytest.raises(ImproperlyConfigured, match="must define an 'fga_config' attribute"):
+            folder.save()
+
+        with pytest.raises(ImproperlyConfigured, match="must define an 'fga_config' attribute"):
+            folder.delete()
