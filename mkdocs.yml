@@ -132,6 +132,7 @@ nav:
     - Securing API Views: examples/views.md
     - Stateless Dashboards: examples/stateless-views.md
     - Nested Hierarchies (Trees): examples/advanced-trees.md
+    - Model Property Fallback: examples/advanced_creation.md
 
   - API Reference:
     - Configuration (Structs): api/configs.md

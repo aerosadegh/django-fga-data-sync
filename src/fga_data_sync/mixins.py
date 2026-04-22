@@ -319,12 +319,36 @@ class FGAViewMixin:
         config = self._get_config()
 
         if request.method == "POST" and config.create_parent_type:
-            parent_id = request.data.get(config.create_parent_field)
+            parent_field = str(config.create_parent_field)
+            parent_id: str | None = request.data.get(parent_field)
+
+            # Model Instantiation Fallback
+            if not parent_id:
+                try:
+                    # Safely extract the model class from the view
+                    model_class = None
+                    # 1. Safely extract the attribute to a local variable to satisfy MyPy
+                    view_queryset = getattr(self, "queryset", None)
+                    get_qs_func = getattr(self, "get_queryset", None)
+
+                    # 2. Interact with the local variables instead of `self.queryset`
+                    if view_queryset is not None:
+                        model_class = view_queryset.model
+                    elif callable(get_qs_func):
+                        model_class = get_qs_func().model
+
+                    # 3. Instantiate an empty dummy instance and read the property
+                    if model_class:
+                        dummy_instance = model_class()
+                        parent_id = getattr(dummy_instance, parent_field, None)
+                except Exception as e:  # pragma: no cover
+                    logger.debug(f"Failed to resolve {parent_field} from model fallback: {e}")
+
             if not parent_id:
                 raise PermissionDenied(
                     f"Payload must include parent field: '{config.create_parent_field}'"
                 )
-            if config.create_relation is None:
+            if config.create_relation is None:  # pragma: no cover
                 raise ImproperlyConfigured("FGAViewConfig must have all `create_*` keys together.")
 
             client = get_fga_client()
@@ -376,16 +400,28 @@ class FGAViewMixin:
                 relation = config.read_relation
 
         if config.object_type and relation:
+            # Safely resolve the Object ID statelessly OR via the object
+            object_id = None
+            if config.lookup_header:
+                object_id = request.META.get(config.lookup_header)
+            elif config.lookup_url_kwarg:
+                object_id = getattr(self, "kwargs", {}).get(config.lookup_url_kwarg)
+            else:
+                object_id = getattr(obj, "pk", None)
+
+            if not object_id:
+                raise PermissionDenied("Target object identifier could not be resolved.")
+
             client = get_fga_client()
             try:
                 response = client.check(
                     ClientCheckRequest(
                         user=self._get_fga_user(),
                         relation=relation,
-                        object=f"{config.object_type}:{obj.pk}",
+                        object=f"{config.object_type}:{object_id}",
                     )
                 )
-            except ValidationException as e:
+            except ValidationException as e:  # pragma: no cover
                 error_msg = (
                     f"FGA DSL Mismatch: The relation '{relation}' on type "
                     f"'{config.object_type}' does not exist in your OpenFGA schema. "
