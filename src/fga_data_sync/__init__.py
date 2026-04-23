@@ -14,13 +14,13 @@ except importlib.metadata.PackageNotFoundError:
 def __getattr__(name: str) -> Any:
     """
     Lazy loading of exports to avoid Django app registry issues.
-    
+
     Args:
         name: The attribute name being accessed on the module.
-        
+
     Returns:
         Any: The requested class or function.
-        
+
     Raises:
         AttributeError: If the requested attribute does not exist in this module.
     """
@@ -36,8 +36,20 @@ def __getattr__(name: str) -> Any:
         from .permissions import IsFGAAuthorized
 
         return IsFGAAuthorized
+    if name == "FGAPermissionSerializerMixin":
+        from .serializers import FGAPermissionSerializerMixin
+
+        return FGAPermissionSerializerMixin
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = ["FGAModelSyncMixin", "FGAViewMixin", "IsFGAAuthorized", "__version__"]
+__all__ = [
+    "FGAModelSyncMixin",
+    "FGAPermissionSerializerMixin",
+    "FGAViewMixin",
+    "IsFGAAuthorized",
+    "__version__",
+]

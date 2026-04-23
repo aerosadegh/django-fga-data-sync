@@ -271,6 +271,26 @@ class FGAViewMixin:
 
         return self.fga_config
 
+    def get_serializer_context(self):
+        """
+        DRF hook: Injects FGA tools directly into the serializer context
+        so our FGAPermissionSerializerMixin can use them without extra DB queries.
+        """
+        context = super().get_serializer_context()
+
+        # 1. Get the raw user ID resolved by TraefikIdentityMiddleware
+        raw_user_id = getattr(self.request, "fga_user", None)
+
+        if raw_user_id:
+            # Use your package's prefix setting
+            prefix = get_setting("FGA_USER_PREFIX")  # e.g., "user:"
+            context["fga_user"] = f"{prefix}{raw_user_id}"
+
+            # Assuming your package has a standardized way to grab the FGA client
+            context["fga_client"] = get_fga_client()
+
+        return context
+
     def get_queryset(self):
         queryset = super().get_queryset()
         view_kwargs = getattr(self, "kwargs", {})
