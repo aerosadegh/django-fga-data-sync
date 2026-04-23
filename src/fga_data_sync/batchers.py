@@ -1,5 +1,5 @@
 # fga_data_sync/batchers.py
-from openfga_sdk.client.models import ClientCheckRequest
+from openfga_sdk.client.models import ClientBatchCheckItem, ClientBatchCheckRequest
 from rest_framework import serializers
 
 from .conf import get_setting
@@ -45,7 +45,7 @@ class FGABatchListSerializer(serializers.ListSerializer):
             object_key = f"{fga_object_type}:{obj.pk}"
             for perm in fga_permissions:
                 checks.append(
-                    ClientCheckRequest(
+                    ClientBatchCheckItem(
                         user=fga_user,
                         relation=perm,
                         object=object_key,
@@ -57,7 +57,8 @@ class FGABatchListSerializer(serializers.ListSerializer):
         fga_permissions_map = {}
 
         try:
-            batch_response = fga_client.batch_check(checks)
+            batch_request = ClientBatchCheckRequest(checks=checks)
+            batch_response = fga_client.batch_check(batch_request)
 
             # Map the SDK responses into a fast dictionary lookup
             for resp in batch_response.responses:

@@ -1,5 +1,8 @@
 # fga_data_sync/serializers.py
-from openfga_sdk.client.models import ClientCheckRequest
+from openfga_sdk.client.models import (
+    ClientBatchCheckItem,
+    ClientBatchCheckRequest,
+)
 from rest_framework import serializers
 
 from .conf import get_setting
@@ -70,10 +73,11 @@ class FGAPermissionSerializerMixin(serializers.Serializer):
         try:
             # Run a mini-batch check for the single object's multiple permissions
             checks = [
-                ClientCheckRequest(user=fga_user, relation=p, object=object_key)
+                ClientBatchCheckItem(user=fga_user, relation=p, object=object_key)
                 for p in fga_permissions
             ]
-            batch_response = fga_client.batch_check(checks)
+            batch_request = ClientBatchCheckRequest(checks=checks)
+            batch_response = fga_client.batch_check(batch_request)
 
             for resp in batch_response.responses:
                 req = getattr(resp, "_request", getattr(resp, "request", None))
