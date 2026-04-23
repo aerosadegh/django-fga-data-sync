@@ -1,4 +1,4 @@
-# 🚀 Advanced Parent Resolution: The Model Property Fallback
+# Advanced Parent Resolution: The Model Property Fallback
 
 When securing `POST` (creation) endpoints, the OpenFGA validation phase happens *before* the Django model is instantiated and saved. By default, `FGAViewConfig` expects the frontend to provide the parent's ID directly in the JSON payload (via `create_parent_field`).
 
@@ -61,7 +61,7 @@ class Company(FGAModelSyncMixin, models.Model):
     name = models.CharField(max_length=255)
     creator_id = models.CharField(max_length=100)
 
-    # 🤠 THE TRICK: Provide a static property for the FGA Mixin to read
+    # THE TRICK: Provide a static property for the FGA Mixin to read
     @property
     def platform_id(self) -> str:
         return "global"
