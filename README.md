@@ -1,8 +1,11 @@
 # Django FGA Data Sync
 
-A declarative, strictly-typed, Outbox-pattern OpenFGA synchronizer for Django models.
+A declarative, strictly-typed OpenFGA integration for Django.
 
-This package automatically translates your Django relational models into OpenFGA authorization graph tuples. It guarantees perfect synchronization between your local PostgreSQL database and your distributed OpenFGA server using the Transactional Outbox pattern and Celery.
+This package provides a complete "Holy Trinity" for enterprise authorization:
+1. **Data Layer:** Automatically synchronizes Django models to OpenFGA using the Transactional Outbox pattern.
+2. **Routing Layer:** Secures Django REST Framework (DRF) Views with zero-business-logic mixins and permission classes.
+3. **Presentation Layer:** Injects high-performance, batch-evaluated permission flags into DRF Serializers for seamless React/Vue frontend integration.
 
 ## 📦 Installation
 
@@ -12,12 +15,17 @@ Install the package via pip or uv:
 pip install django-fga-data-sync
 ```
 
-Add it to your `INSTALLED_APPS` in `settings.py`:
+Add it to your `INSTALLED_APPS` and include the Middleware in `settings.py`:
 
 ```python
 INSTALLED_APPS = [
     # ... your other apps ...
     'fga_data_sync',
+]
+
+MIDDLEWARE = [
+    # ... standard middleware ...
+    'fga_data_sync.middleware.TraefikIdentityMiddleware',
 ]
 ```
 
@@ -38,18 +46,25 @@ FGA_DATA_SYNC = {
     # REQUIRED: The Store ID provisioned by the Central Auth Service
     "OPENFGA_STORE_ID": "01H...XYZ",
 
-    # OPTIONAL: Defaults shown below
+    # Core Settings
     "OPENFGA_API_URL": "http://localhost:8080",
     "BATCH_SIZE": 50,
     "MAX_RETRIES": 5,
+
+    # Identity Management (Traefik / API Gateway integration)
+    "REQUEST_HEADER_MAPPINGS": {
+        "X-User-Id": "fga_user",
+    },
+    "FGA_USER_ATTR": "fga_user",
+    "FGA_USER_PREFIX": "user:",
 }
 ```
 
 ## 💡 Usage
 
-To synchronize a Django model with OpenFGA, simply inherit from `FGAModelSyncMixin` and define your `fga_config` using the `FGAModelConfig` dataclass. The package handles everything else automatically.
+### 1. Synchronizing Models (`FGAModelSyncMixin`)
 
-### Example: Defining Cascading Inheritance & Roles
+Inherit from `FGAModelSyncMixin` and define your `fga_config` using the `FGAModelConfig` dataclass. The package handles tuple generation, diffing, and outbox queuing automatically.
 
 ```python
 from django.db import models
@@ -59,36 +74,94 @@ from fga_data_sync.structs import FGAModelConfig, FGAParentConfig, FGACreatorCon
 
 class Document(FGAModelSyncMixin, models.Model):
     title = models.CharField(max_length=255)
-
-    # Soft references (No foreign keys required for FGA mapping!)
-    folder_id = models.UUIDField()
-    creator_id = models.UUIDField()
+    folder_id = models.CharField(max_length=255)
+    creator_id = models.CharField(max_length=255)
 
     fga_config: ClassVar[FGAModelConfig] = FGAModelConfig(
         object_type="document",
         parents=[
             FGAParentConfig(
-                relation="folder",           # OpenFGA relation
-                parent_type="folder",        # OpenFGA parent type
-                local_field="folder_id"      # Django model field
+                relation="folder",
+                parent_type="folder",
+                local_field="folder_id"
             )
         ],
         creators=[
             FGACreatorConfig(
-                relation="editor",           # OpenFGA explicit role
-                local_field="creator_id"     # Django model field
+                relation="editor",
+                local_field="creator_id"
             )
         ]
     )
 ```
 
-Whenever you call `Document.objects.create()`, `document.save()`, or `document.delete()`, the mixin will automatically calculate the graph diffs, queue the tuples in the local Outbox table, and trigger the Celery worker to push them to OpenFGA asynchronously.
+### 2. Securing API Views (`FGAViewMixin`)
+
+Secure your DRF endpoints instantly using simple, declarative dictionary configurations. No complex permission classes required. `FGAViewMixin` handles queryset filtering (lists), parent checks (creation), and object checks (updates/deletes).
+
+```python
+from rest_framework import viewsets
+from fga_data_sync.mixins import FGAViewMixin
+from fga_data_sync.structs import FGAViewConfig
+from .models import Document
+from .serializers import DocumentSerializer
+
+class DocumentViewSet(FGAViewMixin, viewsets.ModelViewSet):
+    queryset = Document.objects.all()
+    serializer_class = DocumentSerializer
+
+    fga_config = FGAViewConfig(
+        object_type="document",
+        read_relation="can_read_document",
+        update_relation="can_update",
+        delete_relation="can_delete",
+
+        # Parent-Level Authorization for Creation (POST)
+        # Verifies the user has permission on the parent scope before allowing creation
+        create_parent_type="folder",
+        create_parent_field="folder_id",
+        create_relation="can_add_items"
+    )
+```
+
+### 3. Frontend Integration (`FGAPermissionSerializerMixin`)
+
+Inject FGA evaluations directly into your API responses so your frontend knows exactly which action buttons to render. The mixin utilizes advanced custom list serializers to prevent N+1 queries, batching all checks into a single OpenFGA network request.
+
+```python
+from rest_framework import serializers
+from fga_data_sync.serializers import FGAPermissionSerializerMixin
+from .models import Document
+
+class DocumentSerializer(FGAPermissionSerializerMixin, serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        # The mixin automatically injects "_permissions" into this tuple!
+        fields = ("id", "title", "folder_id")
+
+        # Declarative rules processed by the mixin
+        fga_object_type = "document"
+        fga_permissions = ("can_update", "can_delete")
+```
+
+**Resulting JSON Payload:**
+```json
+{
+  "id": 101,
+  "title": "Q3 Financials",
+  "folder_id": "folder_55",
+  "_permissions": {
+    "can_update": true,
+    "can_delete": false
+  }
+}
+```
 
 ## 🕸️ Celery Configuration
 
-Because this package uses the Transactional Outbox pattern, you must have Celery configured in your project to process the queued network requests.
+Because this package uses the Transactional Outbox pattern for model syncing, you must have Celery configured in your project to process the queued network requests.
 
-The background task (`process_fga_outbox_batch`) is automatically triggered upon a successful database commit. However, as a fail-safe against broker crashes, you should configure a Celery Beat sweeper to run periodically:
+Configure a Celery Beat sweeper to run periodically as a fail-safe:
 
 ```python
 # celery.py

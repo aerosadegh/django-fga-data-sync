@@ -130,6 +130,7 @@ nav:
     - Syncing Django Models: examples/models.md            # Move multi-parent tutorial here
     - Assigning Dynamic Roles: schema/role-assignments.md  # Consolidate all manual Outbox/M2M logic here
     - Securing API Views: examples/views.md
+    - Frontend & Serializers: examples/frontend-integration.md
     - Stateless Dashboards: examples/stateless-views.md
     - Nested Hierarchies (Trees): examples/advanced-trees.md
     - Model Property Fallback: examples/advanced_creation.md
